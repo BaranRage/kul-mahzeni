@@ -41,7 +41,7 @@ uv run --no-project --with pygame-ce==2.5.8 python main.py
 | Tuş | İşlev |
 | --- | --- |
 | WASD / ok tuşları | Hareket ve menü seçimi |
-| J / X | Saldır, seç, konuş |
+| J / X | Seç, konuş, elle saldır (karakter menzildeki düşmana kendi saldırır; Ayarlar'dan kapatılır) |
 | K / L / I | Yetenekler; I: ulti |
 | O | Kelebek Işını (Öte Boyut ödülüyle açılır) |
 | Boşluk | Atılma |
@@ -50,9 +50,9 @@ uv run --no-project --with pygame-ce==2.5.8 python main.py
 | F11 | Tam ekran |
 | R | Ölünce silah seçimine dön |
 
-Öte Boyut bölümünde W, A, S, D yürür, ok tuşları (veya Q, E) döner, J ateş eder, boşluk ileri fırlatır, 1, 2, 3 silah değiştirir.
+Öte Boyut bölümünde W, A, S, D yürür, ok tuşları (veya Q, E) döner, nişangâh düşmanın üstüne gelince kendi ateş eder, boşluk ileri fırlatır, 1, 2, 3 silah değiştirir.
 
-**Uyarı:** Oyunda ani beyaz ekran, korkunç bir yüz ve yüksek çığlık sesi içeren korku anları var. Duraklatma menüsünde Ayarlar > Korku anları ile kapatılabilir.
+**Uyarı:** Oyunda ani beyaz ekran, renkli parlayan ışıklar, korkunç bir yüz ve yüksek çığlık sesi içeren korku anları var. Işığa duyarlıysan veya epilepsin varsa kapatarak oyna. Duraklatma menüsünde Ayarlar > Korku anları ile kapatılabilir.
 
 Oyun kayıtları ve ayarlar kullanıcı klasöründeki `.config/kul-mahzeni/` dizinine yazılır. Paylaşım paketi kişisel oyun kayıtları içermez.
 

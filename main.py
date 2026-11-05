@@ -49,8 +49,8 @@ BOLT_SPEED = 72
 IRIS_TIME = 0.45
 
 # Kat yapısı: 1-3 dövüş, 4 sunak, 5-6 dövüş, 7 bekçi; sonra Öykü'nün sığınağı
-FLOOR_LEN = 7
-REST_IDX = (4,)
+FLOOR_LEN = 7               # test için doğrudan bekçiye inerken kullanılır; gerçek uzunluk katta belirlenir
+FLOOR_MIN, FLOOR_MAX = 7, 10
 
 # --- Hikâye: Prenses Öykü --------------------------------------------------------
 OYKU_PAL = {
@@ -100,6 +100,7 @@ BOSS_TINTS = [(0, 0, 0), (40, 0, -10), (-10, -6, 30), (30, -10, 20)]
 DIALOG_RESCUE = [
     "Kim var orada?.. Bekçinin ayak sesleri sustu.",
     "Sen... beni kurtarmaya mı geldin? Adım Öykü.",
+    "{ad} demek. Bu adı unutmayacağım.",
     "Yıllardır bu mahzenin kül kokusunu soluyorum.",
     "Burası, bana kalan son ışık. Burada güvendesin.",
     "Derinlerde karanlıkta parlayan bir Ay Çiçeği açarmış.",
@@ -343,6 +344,34 @@ BOONS = {
         "icon": ["..bbbbb..", ".b.....b.", "b..www..b", "b.w.b.w.b", "b.wbwbw.b",
                  "b.w.b.w.b", "b..www..b", ".b.....b.", "..bbbbb.."],
     },
+    "kor_tohumu": {
+        "name": "Kor Tohumu", "desc": ["Öldürdüğün düşman", "%25 şansla patlar"], "max": 1, "rare": True, "relic": True,
+        "icon": ["....y....", "...yoy...", "..yoroy..", ".yorRroy.", ".yorRroy.", "..yoroy..", "...yoy...", ".g.....g.", "g.g.g.g.g"],
+    },
+    "kan_ayi": {
+        "name": "Kan Ayı", "desc": ["2 can ve altında", "hasar +2"], "max": 1, "rare": True, "relic": True,
+        "icon": ["...rrrr..", ".rrRRrr..", ".rRRrr...", "rRRr.....", "rRRr.....", "rRRr.....", ".rRRrr...", ".rrRRrr..", "...rrrr.."],
+    },
+    "sans_zari": {
+        "name": "Şans Zarı", "desc": ["%15 şansla", "hasar iki katı"], "max": 1, "rare": True, "relic": True,
+        "icon": ["wwwwwwwww", "w.......w", "w.k...k.w", "w.......w", "w...k...w", "w.......w", "w.k...k.w", "w.......w", "wwwwwwwww"],
+    },
+    "ayna_kirigi": {
+        "name": "Ayna Kırığı", "desc": ["Darbelerin %12'si", "sana değmez"], "max": 1, "rare": True, "relic": True,
+        "icon": [".....bbb.", "....bwwb.", "...bwwb..", "..bwwb...", ".bwwb....", "bwwb.....", "bwb......", "bb.......", "........."],
+    },
+    "hirs_kesesi": {
+        "name": "Hırs Kesesi", "desc": ["Toplanan kül +%50"], "max": 1, "rare": True, "relic": True,
+        "icon": ["...yyy...", "..y...y..", "...yyy...", "..ooooo..", ".ooyyyoo.", "ooyooyyoo", "ooyyyyyoo", ".ooooooo.", "........."],
+    },
+    "ofke_disi": {
+        "name": "Öfke Dişi", "desc": ["Kombo hasarı", "çok daha erken"], "max": 1, "rare": True, "relic": True,
+        "icon": ["w.......w", "ww.....ww", "www...www", ".www.www.", ".wwwwwww.", "..wwwww..", "..wwrww..", "...www...", "....w...."],
+    },
+    "kul_cani": {
+        "name": "Kül Canı", "desc": ["Her 20 öldürmede", "1 can yenile"], "max": 1, "rare": True, "relic": True,
+        "icon": ["..g...g..", ".grr.rrg.", "grRRrRRrg", "grRRRRRrg", ".grRRRrg.", "..grRrg..", "...grg...", "....g....", "........."],
+    },
     "sifa": {
         "name": "Kor Şifası", "desc": ["2 can yenile"], "max": 99,
         "icon": [".rr...rr.", "rRRr.rRRr", "rRRRwRRRr", "rRRwwwRRr", ".rRRwRRr.",
@@ -400,6 +429,81 @@ def _music(rate):
             env = math.exp(-j / rate * 3.2)
             v = env * (0.075 * math.sin(tau * f * j / rate) + 0.025 * math.sin(tau * 2.01 * f * j / rate))
             out[(s0 + j) % n] += v
+    return out
+
+
+# Bölge müzikleri: kök ses oranı, nota dizisi, tempo (vuruş aralığı, sn)
+BIOME_MUSIC = {
+    "kul": (1.0, (220.0, 261.63, 329.63, 311.13, 220.0, 196.0, 261.63, 246.94), 1.0),
+    "kor": (0.89, (293.66, 349.23, 440.0, 415.3, 293.66, 261.63, 349.23, 311.13), 0.5),
+    "kemik": (0.75, (196.0, 233.08, 293.66, 277.18, 196.0, 174.61, 233.08, 220.0), 2.0),
+    "golge": (0.67, (174.61, 207.65, 261.63, 246.94, 155.56, 174.61, 207.65, 196.0), 2.0),
+    "ag": (1.12, (246.94, 293.66, 369.99, 349.23, 246.94, 220.0, 293.66, 277.18), 1.0),
+}
+
+
+def _biome_music(rate, key):
+    """8 sn'lik döngü: _music'in dronu, bölgeye özgü çan dizisi ve kalın davul."""
+    ratio, notes, beat = BIOME_MUSIC[key]
+    n = rate * 8
+    out = [0.0] * n
+    tau = math.tau
+    f1, f2, f3 = 55 * ratio, 55.25 * ratio, 82.5 * ratio
+    for i in range(n):
+        t = i / rate
+        d = (4 * abs((t * f1) % 1.0 - 0.5) - 1) + (4 * abs((t * f2) % 1.0 - 0.5) - 1) + \
+            0.5 * (4 * abs((t * f3) % 1.0 - 0.5) - 1)
+        out[i] = 0.08 * d * (0.75 + 0.25 * math.sin(tau * t / 8))
+    for k, f in enumerate(notes):
+        s0 = k * rate
+        for j in range(int(rate * 1.4)):
+            env = math.exp(-j / rate * 3.2)
+            out[(s0 + j) % n] += env * (0.1 * math.sin(tau * f * j / rate) + 0.035 * math.sin(tau * 2.01 * f * j / rate))
+    b = 0.0
+    while b < 8:  # davul
+        s0 = int(b * rate)
+        for j in range(int(rate * 0.22)):
+            tt = j / rate
+            out[(s0 + j) % n] += 0.2 * math.exp(-tt * 18) * math.sin(tau * (58 + 70 * math.exp(-tt * 40)) * tt)
+        b += beat
+    return out
+
+
+def _fps_music(rate):
+    """Öte Boyut: hızlı, parlak arpej ve dört dörtlük davul."""
+    n = rate * 4
+    out = [0.0] * n
+    tau = math.tau
+    seq = (220, 330, 440, 330, 262, 392, 523, 392, 196, 294, 392, 294, 247, 370, 494, 370)
+    for k, f in enumerate(seq):
+        s0 = int(k * 0.25 * rate)
+        for j in range(int(rate * 0.24)):
+            env = math.exp(-j / rate * 9)
+            sq = 1.0 if (j * f / rate) % 1.0 < 0.5 else -1.0
+            out[(s0 + j) % n] += 0.13 * env * sq
+    for k in range(8):
+        s0 = int(k * 0.5 * rate)
+        for j in range(int(rate * 0.18)):
+            tt = j / rate
+            out[(s0 + j) % n] += 0.24 * math.exp(-tt * 20) * math.sin(tau * (55 + 90 * math.exp(-tt * 45)) * tt)
+    for i in range(n):
+        out[i] += 0.05 * (4 * abs((i / rate * 55) % 1.0 - 0.5) - 1)
+    return out
+
+
+def _ambience(rate, key):
+    """Bölgenin ortam sesi: yavaş nefes alan rüzgâr ve yer yer tekil sesler."""
+    n = rate * 6
+    rnd = random.Random(len(key) * 97 + ord(key[0]))
+    tone = {"kul": 0.02, "kor": 0.035, "kemik": 0.015, "golge": 0.01, "ag": 0.05}[key]
+    out, y = [0.0] * n, 0.0
+    for i in range(n):
+        y += tone * (rnd.uniform(-1, 1) - y)
+        out[i] = y * 2.4 * (0.6 + 0.4 * math.sin(math.tau * i / n * 2))
+    for _ in range(5):  # damlalar, çıtırtılar
+        s0, f = rnd.randrange(n), rnd.uniform(700, 1500) if key != "kor" else rnd.uniform(120, 300)
+        for j in range(int(rate * 0.12)):
+            out[(s0 + j) % n] += 0.16 * math.exp(-j / rate * 40) * math.sin(math.tau * f * j / rate)
     return out
 
 
@@ -475,6 +579,8 @@ class Sfx:
             freq, fmt, ch = pygame.mixer.get_init()
             if fmt != -16:
                 return
+            pygame.mixer.set_num_channels(32)   # 8 kanalda kalabalık sahnede sesler düşüyordu
+            pygame.mixer.set_reserved(2)        # ortam ve kalp atışı için
         except pygame.error:
             return
         self.ch = ch
@@ -502,6 +608,22 @@ class Sfx:
             "boom": _tone(r, 1.2, 60, 20, wave="sq", noise=0.8, lp=(0.4, 0.02), vol=0.75, decay=1.1),
             "scare": _tone(r, 1.1, 700, 2600, wave="sq", noise=0.85, lp=(0.9, 0.9), vol=0.95, decay=0.5) +
                      _tone(r, 1.1, 90, 60, wave="sq", noise=0.4, lp=(0.3, 0.3), vol=0.6, decay=0.4),
+            "hit2": _tone(r, 0.1, 240, 70, noise=0.5, lp=(0.6, 0.5), vol=0.42),
+            "hit3": _tone(r, 0.09, 130, 40, noise=0.35, lp=(0.4, 0.4), vol=0.5),
+            "thud": _tone(r, 0.22, 90, 30, noise=0.3, lp=(0.2, 0.1), vol=0.7, decay=1.2),
+            "step": _tone(r, 0.06, 150, 70, noise=0.65, lp=(0.35, 0.2), vol=0.35),
+            "step2": _tone(r, 0.06, 120, 60, noise=0.7, lp=(0.3, 0.15), vol=0.35),
+            "thrust": _tone(r, 0.14, 520, 180, wave="tri", noise=0.5, lp=(0.8, 0.3), vol=0.45),
+            "cast": _tone(r, 0.22, 240, 880, wave="tri", noise=0.15, vol=0.4, vib=14),
+            "ray": _tone(r, 0.1, 1500, 400, wave="sq", lp=(0.6, 0.3), vol=0.38),
+            "shotgun": _tone(r, 0.24, 240, 40, noise=0.9, lp=(0.9, 0.15), vol=0.75, decay=1.3),
+            "rocket": _tone(r, 0.42, 90, 420, noise=0.7, lp=(0.3, 0.5), vol=0.6),
+            "portal": _tone(r, 0.45, 200, 1400, wave="tri", vol=0.4, vib=9, decay=1.0),
+            "draw": _tone(r, 0.4, 300, 620, wave="tri", noise=0.2, vol=0.28, attack=0.2),
+            "spit": _tone(r, 0.18, 900, 200, noise=0.75, lp=(0.5, 0.3), vol=0.4),
+            "hiss": _tone(r, 0.45, 2400, 1200, noise=0.95, lp=(0.9, 0.5), vol=0.35, attack=0.08),
+            "shimmer": sum((_tone(r, 0.14, f, wave="tri", vol=0.25, decay=1.5) for f in (1318.5, 1568, 1975.5, 2637)), []),
+            "whoosh": _tone(r, 0.3, 300, 80, noise=0.9, lp=(0.15, 0.5), vol=0.4, attack=0.1),
             "charge": _tone(r, 0.5, 120, 300, wave="sq", noise=0.5, lp=(0.1, 0.3), vol=0.35, decay=0.8),
             "talk": _tone(r, 0.03, 660, wave="tri", vol=0.12, decay=1.0),
             "bow": _tone(r, 0.14, 520, 180, wave="tri", noise=0.25, lp=(0.6, 0.2), vol=0.3, decay=2.2),
@@ -511,11 +633,26 @@ class Sfx:
             + _tone(r, 0.6, 1567.98, wave="tri", vol=0.25, decay=2.0, vib=5),
         }
         for k, v in defs.items():
-            self.sounds[k] = self._make(v)
-        self.musics = {"calm": self._make(_music(r)), "boss": self._make(_boss_music(r)),
-                       "haven": self._make(_haven_music(r))}
+            self.sounds[k] = self._make([math.tanh(x * 2.6) for x in v])  # yumuşak kırpma: dolgun ve yüksek
+        self.rate = r
+        self.biome = None
+        self.ambient = {}
+        self.ambient_now = None
+        self.musics = {"boss": self._level(_boss_music(r)), "haven": self._level(_haven_music(r)),
+                       "fps": self._level(_fps_music(r))}
+        self.heart_sound = self._make(
+            [math.tanh(x * 2.2) for x in _tone(r, 0.14, 62, 44, vol=0.8, decay=2.5, wave="tri") + [0.0] * int(r * 0.1) +
+             _tone(r, 0.14, 54, 40, vol=0.65, decay=2.5, wave="tri") + [0.0] * int(r * 0.62)])
+        self.heart_on = False
+        self.chan_amb = pygame.mixer.Channel(0)
+        self.chan_heart = pygame.mixer.Channel(1)
         self.current = None
         self.ok = True
+
+    def _level(self, samples, peak=0.85):
+        """Müziği sabit tepe seviyesine getirir."""
+        top = max(max(samples), -min(samples), 1e-6)
+        return self._make([x * peak / top for x in samples])
 
     def _make(self, samples):
         buf = array("h", (int(max(-1.0, min(1.0, s)) * 32767) for s in samples))
@@ -532,9 +669,45 @@ class Sfx:
             s.set_volume(min(1.0, vol * self.sfx_vol))
             s.play()
 
-    def start_music(self, name="calm"):
-        if not self.ok or self.current == name:
+    def set_biome(self, key):
+        self.biome = key
+
+    def start_ambience(self, key):
+        """Bölgenin ortam döngüsü; ilk girişte üretilir."""
+        if not self.ok or key == self.ambient_now:
             return
+        self.ambient_now = key
+        if key is None:
+            self.chan_amb.fadeout(500)
+            return
+        if key not in self.ambient:
+            self.ambient[key] = self._level(_ambience(self.rate, key), 0.7)
+        self.chan_amb.set_volume(self.amb_level())
+        self.chan_amb.play(self.ambient[key], loops=-1, fade_ms=800)
+
+    def amb_level(self):
+        return 0.0 if self.muted else 0.5 * self.sfx_vol * (0.35 if self.duck else 1.0)
+
+    def set_heart(self, on):
+        """Az canla çalan kalp atışı."""
+        if not self.ok or on == self.heart_on:
+            return
+        self.heart_on = on
+        if on and not self.muted:
+            self.chan_heart.set_volume(0.8 * self.sfx_vol)
+            self.chan_heart.play(self.heart_sound, loops=-1)
+        else:
+            self.chan_heart.fadeout(300)
+
+    def start_music(self, name="calm"):
+        if not self.ok:
+            return
+        if name == "calm":
+            name = f"calm_{self.biome or 'kul'}"
+        if self.current == name:
+            return
+        if name and name not in self.musics:  # bölge müziği ilk gerektiğinde üretilir
+            self.musics[name] = self._level(_biome_music(self.rate, name[5:]))
         if self.current:
             self.musics[self.current].fadeout(400)
         self.current = name
@@ -547,11 +720,16 @@ class Sfx:
         self.muted = not self.muted
         if self.ok and self.current:
             self.musics[self.current].set_volume(self.music_level())
+        if self.ok:
+            self.chan_amb.set_volume(self.amb_level())
+            if self.muted:
+                self.chan_heart.stop()
+                self.heart_on = False
 
     def music_level(self):
         if self.muted:
             return 0.0
-        return 0.55 * self.music_vol * (0.35 if self.duck else 1.0)
+        return 0.75 * self.music_vol * (0.35 if self.duck else 1.0)
 
     def set_levels(self, music, sfx, duck=None):
         self.music_vol, self.sfx_vol = music / 10, sfx / 10
@@ -559,6 +737,8 @@ class Sfx:
             self.duck = duck
         if self.ok and self.current:
             self.musics[self.current].set_volume(self.music_level())
+        if self.ok:
+            self.chan_amb.set_volume(self.amb_level())
 
 
 # --- Çizim yardımcıları ------------------------------------------------------
@@ -655,6 +835,65 @@ PIT_LAYOUTS = [  # uçurum odaları: (x, y, genişlik, yükseklik)
     [(3, 4, 6, 2), (11, 4, 6, 2)],                   # ortası köprülü yarık
     [(4, 2, 3, 2), (13, 2, 3, 2), (4, 6, 3, 2), (13, 6, 3, 2), (9, 4, 2, 2)],  # beş çukur
 ]
+# Bölgeler: her kat birine düşer; renk, ışık ve düşman karışımı değişir.
+# pool: (tür, ağırlık, en erken oda derinliği)
+BIOMES = {
+    "kul": {"name": "Kül Harabesi", "tint": (255, 250, 245), "amb": (0, 0, 0),
+            "pool": [("g", 5, 1), ("c", 3, 2), ("k", 3, 2), ("b", 3, 3), ("s", 2, 5), ("w", 3, 2), ("d", 1, 6)]},
+    "kor": {"name": "Kor Damarı", "tint": (255, 205, 170), "amb": (14, -4, -10),
+            "pool": [("w", 5, 1), ("g", 3, 1), ("b", 4, 2), ("o", 3, 2), ("c", 2, 2), ("k", 2, 3), ("h", 1, 4)]},
+    "kemik": {"name": "Kemik Yatağı", "tint": (235, 240, 205), "amb": (2, 6, -6),
+              "pool": [("a", 5, 1), ("g", 4, 1), ("n", 3, 2), ("s", 3, 4), ("h", 2, 3), ("d", 2, 4), ("c", 2, 2)]},
+    "golge": {"name": "Gölge Çukuru", "tint": (190, 195, 255), "amb": (-8, -4, 14),
+              "pool": [("t", 4, 2), ("e", 4, 1), ("v", 4, 1), ("g", 3, 1), ("w", 2, 1), ("n", 2, 3), ("h", 2, 3)]},
+    "ag": {"name": "Ağ Mağarası", "tint": (200, 240, 205), "amb": (-8, 10, -8),
+           "pool": [("r", 4, 1), ("l", 5, 1), ("m", 4, 1), ("c", 4, 1), ("v", 3, 2), ("a", 2, 3), ("b", 2, 4)]},
+}
+ELITES = {
+    "hizli": {"name": "HIZLI", "col": (120, 240, 255)},
+    "zirhli": {"name": "ZIRHLI", "col": (200, 205, 225)},
+    "patlayan": {"name": "PATLAYAN", "col": (255, 130, 60)},
+    "kalkanli": {"name": "KALKANLI", "col": (190, 130, 255)},
+}
+
+
+def gen_layout(rng):
+    """Odanın içini rastgele üretir; sonucu bağlantı denetiminden geçer."""
+    cells = set()
+    kind = rng.choice(("ring", "walls", "cross", "blobs", "pockets", "scatter"))
+    if kind == "ring":   # ortada kapılı duvar halkası
+        x0, x1, y0, y1 = rng.randint(4, 6), rng.randint(13, 15), 3, rng.randint(6, 7)
+        for x in range(x0, x1 + 1):
+            cells |= {(x, y0), (x, y1)}
+        for y in range(y0, y1 + 1):
+            cells |= {(x0, y), (x1, y)}
+        for _ in range(rng.randint(3, 4)):
+            cells.discard(rng.choice(sorted(cells)))
+        cells -= {((x0 + x1) // 2 + d, y) for d in (0, 1) for y in (y0, y1)}
+    elif kind == "walls":  # sırayla yukarıdan ve aşağıdan gelen duvarlar
+        for i, x in enumerate(range(rng.randint(4, 5), COLS - 3, rng.randint(3, 4))):
+            ys = range(1, 6) if i % 2 == 0 else range(4, ROWS - 1)
+            cells |= {(x, y) for y in ys}
+    elif kind == "cross":
+        cx, cy = COLS // 2 + rng.randint(-2, 2), 5
+        cells |= {(cx + d, cy) for d in range(-4, 5) if abs(d) > 1}
+        cells |= {(cx, cy + d) for d in range(-2, 3) if d}
+    elif kind == "blobs":  # aynalı bloklar
+        for _ in range(rng.randint(2, 4)):
+            x, y, w, h = rng.randint(2, 7), rng.randint(2, 6), rng.randint(1, 3), rng.randint(1, 2)
+            for yy in range(y, y + h):
+                for xx in range(x, x + w):
+                    cells |= {(xx, yy), (COLS - 1 - xx, yy)}
+    elif kind == "pockets":  # köşelerde L biçimli siperler
+        for sx, sy in ((3, 2), (COLS - 4, 2), (3, ROWS - 3), (COLS - 4, ROWS - 3)):
+            dx, dy = (1 if sx < COLS // 2 else -1), (1 if sy < ROWS // 2 else -1)
+            cells |= {(sx + dx * i, sy) for i in range(3)} | {(sx, sy + dy * i) for i in range(2)}
+    else:
+        for _ in range(rng.randint(6, 12)):
+            cells.add((rng.randint(2, COLS - 3), rng.randint(2, ROWS - 3)))
+    return [c for c in cells if 1 <= c[0] < COLS - 1 and 1 <= c[1] < ROWS - 1]
+
+
 ROOM_VARIANTS = {
     "diken": "yerdeki deliklere dikkat",
     "ucurum": "zemin çökmüş, oklar geçer",
@@ -664,7 +903,7 @@ SPIKE_PERIOD = 2.8
 
 
 class Room:
-    def __init__(self, depth, entry_col, rng, kind="combat", floor=1, idx=1):
+    def __init__(self, depth, entry_col, rng, kind="combat", floor=1, idx=1, fork=False):
         self.depth = depth
         self.kind = kind
         self.floor = floor
@@ -679,6 +918,11 @@ class Room:
         self.decor = 0            # sığınağa taşınan eşya sayısı
         self.spikes = {}          # (tx, ty) -> grup
         self.chest = None
+        self.alt_col = None       # iki kapılı odanın ikinci çıkışı
+        self.exits = {}           # sütun -> sonraki oda türü
+        self.elite_down = False
+        self.relic_given = False
+        self.biome = "kul"
         self.took_hit = False     # bu odada can gitti mi?
         self.scare_checked = False
         self.tansi = False        # tüccar odasının sahibi Tansi mi?
@@ -721,8 +965,9 @@ class Room:
                 for tx, ty in ((4, 3), (15, 3), (4, 6), (15, 6)):
                     grid[ty][tx] = "P"
             else:
-                cells = [] if self.variant == "ucurum" else list(rng.choice(LAYOUTS))
-                if rng.random() < 0.5:  # rastgele simetrik sütunlar
+                cells = [] if self.variant == "ucurum" else \
+                    gen_layout(rng) if rng.random() < 0.75 else list(rng.choice(LAYOUTS))
+                if rng.random() < 0.3:  # rastgele simetrik sütunlar
                     for _ in range(rng.randint(1, 3)):
                         tx, ty = rng.randrange(2, 9), rng.randrange(2, 8)
                         cells += [(tx, ty), (COLS - 1 - tx, ty)]
@@ -749,12 +994,23 @@ class Room:
                                 grid[ty][tx] = "S"
                                 self.spikes[(tx, ty)] = ((tx + off) // step) % 2
             grid[0][self.door_col] = "D"
+            self.alt_col = None
+            if fork:
+                options = [c for c in range(3, COLS - 3) if abs(c - self.door_col) >= 5]
+                if options:
+                    self.alt_col = rng.choice(options)
+                    grid[0][self.alt_col] = "D"
+                    for ty in (1, 2):
+                        grid[ty][self.alt_col] = "."
             grid[ROWS - 1][entry_col] = "E"
             self.grid = ["".join(r) for r in grid]
             if self._connected():
                 break
+        else:  # hiçbir deneme bağlanmadıysa sütunları kaldır
+            self.grid = [r.replace("P", ".").replace("C", ".") for r in self.grid]
         self.torches = []
-        cols = [c for c in range(2, COLS - 2) if abs(c - self.door_col) > 1]
+        cols = [c for c in range(2, COLS - 2) if abs(c - self.door_col) > 1 and
+                (self.alt_col is None or abs(c - self.alt_col) > 1)]
         rng.shuffle(cols)
         for c in sorted(cols[:rng.randint(2, 3)]):
             self.torches.append((c, 0))
@@ -783,6 +1039,15 @@ class Room:
         self.wave_index = 0
         self.cleared = self.kind in ("rest", "haven", "ani", "dukkan", "lanet")
         self.door_open = self.kind in ("rest", "dukkan", "lanet")
+
+    def door_cols(self):
+        return [self.door_col] + ([self.alt_col] if self.alt_col is not None else [])
+
+    def apply_biome(self, key):
+        self.biome = key
+        if self.kind in ("haven", "ani"):
+            return
+        self.ambient = tuple(max(0, min(255, a + d)) for a, d in zip(self.ambient, BIOMES[key]["amb"]))
 
     def _connected(self):
         floor = {(x, y) for y in range(ROWS) for x in range(COLS) if self.grid[y][x] in ".DES"}
@@ -1037,7 +1302,8 @@ def build_haven(room):
     pygame.draw.rect(bg, (210, 90, 120), (136, 54, 48, 26))
     for i in range(0, 48, 6):
         bg.set_at((136 + i + 3, 67), (240, 200, 110))
-    draw_arch(bg, room.door_col, 0)
+    for c in room.door_cols():
+        draw_arch(bg, c, 0)
     draw_arch(bg, room.entry_col, ROWS - 1)
     return bg
 
@@ -1101,7 +1367,8 @@ def build_memory(room):
         pygame.draw.rect(bg, (130, 90, 60), (150, 92, 20, 12))   # yıldız kutusu
         pygame.draw.rect(bg, (200, 150, 90), (150, 90, 20, 3))
         bg.set_at((160, 97), (255, 240, 170))
-    draw_arch(bg, room.door_col, 0)
+    for c in room.door_cols():
+        draw_arch(bg, c, 0)
     draw_arch(bg, room.entry_col, ROWS - 1)
     return bg
 
@@ -1122,6 +1389,62 @@ def draw_pit(bg, room, tx, ty, rng):
         pygame.draw.line(bg, (60, 54, 68), (x, y), (x, y + TILE - 1))
     if room.grid[ty][tx + 1] != "C":
         pygame.draw.line(bg, (60, 54, 68), (x + TILE - 1, y), (x + TILE - 1, y + TILE - 1))
+
+
+def draw_biome_decor(bg, room, rng, floor):
+    """Her bölgenin yerde bıraktığı izler."""
+    if not floor:
+        return
+    key = room.biome
+    for _ in range(rng.randint(5, 9)):
+        tx, ty = rng.choice(floor)
+        x, y = tx * TILE + rng.randrange(2, 12), ty * TILE + rng.randrange(3, 12)
+        if key == "kor":  # kor çatlakları
+            for _ in range(rng.randint(3, 6)):
+                nx, ny = x + rng.randint(-5, 5), y + rng.randint(-4, 4)
+                pygame.draw.line(bg, (180, 60, 24), (x, y), (nx, ny))
+                bg.set_at((x, y), (255, 170, 70))
+                x, y = nx, ny
+        elif key == "kemik":  # kaburgalar ve kafatasları
+            for i in range(4):
+                pygame.draw.arc(bg, (150, 145, 125), (x + i * 3, y, 6, 8), 0, math.pi, 1)
+            pygame.draw.line(bg, (130, 125, 108), (x, y + 4), (x + 14, y + 4))
+        elif key == "golge":  # mor kristaller
+            for i in range(rng.randint(2, 3)):
+                h = rng.randint(4, 8)
+                pygame.draw.polygon(bg, (120, 90, 210), [(x + i * 3, y), (x + i * 3 + 2, y), (x + i * 3 + 1, y - h)])
+                bg.set_at((x + i * 3 + 1, y - h + 1), (220, 200, 255))
+        elif key == "ag":  # mantar ve ağ
+            pygame.draw.rect(bg, (190, 190, 170), (x + 1, y, 2, 3))
+            pygame.draw.ellipse(bg, (110, 170, 90), (x - 1, y - 3, 6, 4))
+            for j in range(5):
+                a = j * math.tau / 5
+                pygame.draw.line(bg, (90, 96, 92), (x + 9, y), (int(x + 9 + math.cos(a) * 7), int(y + math.sin(a) * 5)))
+        else:  # kül yığınları
+            pygame.draw.ellipse(bg, (70, 66, 74), (x, y, rng.randint(6, 11), 4))
+            pygame.draw.ellipse(bg, (96, 92, 100), (x + 2, y, 4, 2))
+
+
+FOG_CACHE = {}
+FOG_COLORS = {"kul": (120, 110, 120), "kor": (200, 90, 40), "kemik": (170, 175, 130), "golge": (90, 90, 210),
+              "ag": (90, 170, 100)}
+
+
+def fog_layer(key):
+    """Oda üstünde süzülen ince sis: iki kat genişlikte, döngülü."""
+    if key not in FOG_CACHE:
+        rng = random.Random(len(key) * 13 + 5)
+        f = pygame.Surface((W * 2, WORLD_H), pygame.SRCALPHA)
+        c = FOG_COLORS[key]
+        for _ in range(70):
+            w_, h_ = rng.randint(40, 110), rng.randint(10, 26)
+            x, y = rng.randrange(W), rng.randrange(WORLD_H)
+            blob = pygame.Surface((w_, h_), pygame.SRCALPHA)
+            pygame.draw.ellipse(blob, c + (9,), (0, 0, w_, h_))
+            f.blit(blob, (x, y))
+            f.blit(blob, (x + W, y))
+        FOG_CACHE[key] = f
+    return FOG_CACHE[key]
 
 
 def build_background(room, font):
@@ -1201,7 +1524,8 @@ def build_background(room, font):
         for y in range(2, 2 + rng.randrange(8, 14)):
             bg.set_at((x, y), (84, 78, 92) if y % 3 else (36, 32, 42))
     # kapılar
-    draw_arch(bg, room.door_col, 0)
+    for c in room.door_cols():
+        draw_arch(bg, c, 0)
     draw_arch(bg, room.entry_col, ROWS - 1)
     ex = room.entry_col * TILE
     for bx in range(4, 13, 3):
@@ -1254,6 +1578,10 @@ def build_background(room, font):
             bg.blit(img, ((W - img.get_width()) // 2, WORLD_H - 46 + i * 11))
     for tx, ty in sorted(pillars, key=lambda p: p[1]):
         draw_pillar(bg, tx, ty, rng)
+    draw_biome_decor(bg, room, rng, floor)
+    tint_img = pygame.Surface((W, WORLD_H))  # bölgenin rengi
+    tint_img.fill(BIOMES[room.biome]["tint"])
+    bg.blit(tint_img, (0, 0), special_flags=pygame.BLEND_RGB_MULT)
     return bg
 
 
@@ -1339,6 +1667,7 @@ MASTERY_NAMES = {"kilic": "her 3. savuruş dalga yollar", "yay": "her 3. atış 
                  "balyoz": "her 3. vuruş şok halkası çıkarır", "yumruk": "her 3. vuruş şok dalgası yapar",
                  "mizrak": "her 3. saplama uç fırlatır", "asa": "her 3. atış ikinci küre yollar"}
 SKILL_KEYS = ("K", "L", "I", "O")
+AUTO_RANGE = {"kilic": 32, "yumruk": 26, "balyoz": 34, "mizrak": 50, "yay": 165, "asa": 130}
 BEAM_SKILL = ("isin", "Kelebek Işını", 9.0)
 SKILL_DESC = {
     "girdap": "Dönerek çevreni biçer, kor toplarını söndürür",
@@ -1434,6 +1763,43 @@ HERO_LEGS = [
     ["..kbBk.kbk..", "..kBBk.kBBk.", "..kkk..kkk.."],
     ["..kbk.kbBk..", ".kBBk.kBBk..", ".kkk..kkk..."],
 ]
+# Karakter oluşturma: seçenekler ve kahraman görselini boyama
+LOOK_HOODS = [("Mor", (88, 80, 124)), ("Kızıl", (140, 50, 50)), ("Orman", (60, 110, 70)), ("Deniz", (50, 90, 150)),
+              ("Kül", (110, 108, 116)), ("Altın", (170, 130, 50)), ("Gece", (40, 40, 62))]
+LOOK_SCARVES = [("Kan", (176, 52, 60)), ("Turkuaz", (50, 180, 170)), ("Altın", (230, 180, 70)), ("Kar", (225, 225, 235)),
+                ("Mor", (150, 80, 200))]
+LOOK_EYES = [("Kor", (255, 150, 80), (255, 230, 170)), ("Buz", (110, 190, 255), (220, 245, 255)),
+             ("Zehir", (120, 240, 90), (225, 255, 190)), ("Kan", (240, 50, 50), (255, 170, 160)),
+             ("Hayalet", (220, 220, 240), (255, 255, 255))]
+LOOK_HATS = ["Yok", "Taç", "Boynuz", "Tüy", "Kulak"]
+HAT_ROWS = {
+    1: {"y": ["..y.y.y.y...", "..yyyyyyy..."], "pal": {"y": (250, 205, 80)}, "top": 0},
+    2: {"y": ["w........w..", "ww......ww..", ".ww....ww..."], "pal": {"w": (230, 225, 205)}, "top": 0},
+    3: {"y": [".....rr.....", "....rRr.....", "....rr......"], "pal": {"r": (220, 70, 80), "R": (255, 170, 120)}, "top": 0},
+    4: {"y": ["..k.....k...", ".kek...kek..", ".kek...kek.."], "pal": {"k": (20, 16, 24), "e": (240, 150, 170)}, "top": 0},
+}
+DEFAULT_LOOK = {"name": "", "hood": 0, "scarf": 0, "eyes": 0, "hat": 0}
+
+
+def hero_frames(look=None):
+    """Kahramanı seçilen renk ve başlıkla üretir."""
+    lk = dict(DEFAULT_LOOK, **(look or {}))
+    pal = dict(HERO_PAL)
+    base = LOOK_HOODS[lk["hood"] % len(LOOK_HOODS)][1]
+    for ch, k in (("1", 0.35), ("2", 0.6), ("3", 0.95), ("4", 1.4)):
+        pal[ch] = tuple(min(255, int(v * k)) for v in base)
+    sc = LOOK_SCARVES[lk["scarf"] % len(LOOK_SCARVES)][1]
+    pal["R"], pal["r"] = sc, tuple(int(v * 0.6) for v in sc)
+    _, pal["e"], pal["E"] = LOOK_EYES[lk["eyes"] % len(LOOK_EYES)]
+    frames = build_frames(HERO_BODY, HERO_LEGS, pal)
+    hat = HAT_ROWS.get(lk["hat"] % len(LOOK_HATS))
+    if hat:
+        img = sprite_from_rows(hat["y"], hat["pal"])
+        for f in frames:
+            f.blit(img, (0, hat["top"]))
+    return frames
+
+
 WPAL = {
     "k": (12, 9, 16), "w": (230, 232, 245), "s": (150, 156, 176), "d": (90, 94, 110),
     "g": (210, 160, 60), "G": (150, 100, 40), "o": (120, 78, 44), "O": (160, 108, 62),
@@ -1452,7 +1818,7 @@ WEAPON_SPRITES = {
 
 
 class Player:
-    def __init__(self, x, y, weapon="kilic"):
+    def __init__(self, x, y, weapon="kilic", look=None):
         self.x, self.y = x, y          # ayak merkezi
         self.weapon = weapon
         self.wp = WEAPONS[weapon]
@@ -1479,12 +1845,14 @@ class Player:
         self.invuln = 0.0
         self.kb = [0.0, 0.0]
         self.trail = []                # (x, y, frame, face, ömür)
-        self.frames = build_frames(HERO_BODY, HERO_LEGS, HERO_PAL)
+        self.frames = hero_frames(look)
         self.wimg = sprite_from_rows(WEAPON_SPRITES[weapon], WPAL)
         self.events = []
         # yetenekler
         self.skill_cd = [0.0, 0.0, 0.0, 0.0]   # sonuncusu kelebek ışını
         self.has_beam = False
+        self.auto_aim = None        # otomatik saldırının kilitlendiği yön
+        self.webbed = False
         self.room_shield = 0
         self.mastery = 0            # silah ustalığı seviyesi
         self.mastery_kills = 0
@@ -1620,7 +1988,7 @@ class Player:
         if attack_pressed and self.attack_cd == 0 and self.dash_t == 0:
             self.attack_t = self.attack_total = wp["time"]
             self.attack_cd = wp["cd"] * self.atk_cd_mul
-            self.attack_aim = self.aim
+            self.attack_aim = self.auto_aim or self.aim
             if self.attack_aim[0]:
                 self.face = 1 if self.attack_aim[0] > 0 else -1
             self.hit_set = set()
@@ -1629,7 +1997,9 @@ class Player:
                 self.events.append("special")
             if self.weapon == "asa":
                 self.events.append("orb")
-                sfx.play("shoot", 0.6)
+                sfx.play("cast", 0.8)
+            elif self.weapon == "mizrak":
+                sfx.play("thrust", 0.9)
             elif self.weapon == "yay":
                 self.events.append("arrow")
                 sfx.play("bow", 0.8)
@@ -1654,7 +2024,7 @@ class Player:
                 self.skill_dash_dmg = 0
         else:
             slow = wp["slow"] if self.attack_t > 0 else 1.0
-            sp = PLAYER_SPEED * self.speed_mul * slow
+            sp = PLAYER_SPEED * self.speed_mul * slow * (0.5 if self.webbed else 1.0)
             vx, vy = dx * sp, dy * sp
         vx += self.kb[0]
         vy += self.kb[1]
@@ -1685,7 +2055,7 @@ class Player:
         if self.weapon == "mizrak":  # uzun ve dar: baktığın yönde çizgi
             ln, wd = int(38 * self.reach), 10
             cx, cy = self.x + ax * 23 * self.reach, self.y - 7 + ay * 23 * self.reach
-            if ax and ay:
+            if min(abs(ax), abs(ay)) > 0.38:
                 ln = wd = int(26 * self.reach)
             w, h = (ln, wd) if abs(ax) >= abs(ay) else (wd, ln)
             return pygame.Rect(int(cx) - w // 2, int(cy) - h // 2, w, h)
@@ -1700,6 +2070,10 @@ class Player:
         if self.dash_t > 0 and self.perfect_cd <= 0 and self.hp > 0:
             self.events.append("perfect")  # darbenin içinden atıldın
         if self.invuln > 0 or self.dash_t > 0 or self.hp <= 0 or self.leap:
+            return False
+        if "ayna_kirigi" in self.boons and random.random() < 0.12:
+            self.invuln = 0.4
+            self.events.append("block")
             return False
         if self.shield > 0:  # demir deri darbeyi emer
             self.shield -= 1
@@ -1853,6 +2227,8 @@ class Enemy:
     SPAWN_TIME = 0.7
     KUL = 1
     passive = False           # oda temizliğini engellemez
+    elite = None              # seçkin düşman niteliği
+    ward = 0                  # şamanın verdiği koruma
     burn = 0.0                # silah ruhu etkileri
     burn_tick = 0.0
     slow = 0.0
@@ -1907,6 +2283,9 @@ class Enemy:
     def touching(self):
         """Şu an değince can götürüyor mu?"""
         return False
+
+    def on_death(self, game):
+        pass
 
     def on_touch(self):
         pass
@@ -2189,7 +2568,7 @@ def render_boss(arm, crouch, step, tint):
 
 
 class Boss(Enemy):
-    """Kat bekçisi. İki evre: yarı canın altında öfkelenir, yeni saldırılar açar."""
+    """Kat bekçisi. Üç evre: yarı canda öfkelenir, çeyrek canda Son Nefes ile imza saldırısını açar."""
 
     SPAWN_TIME = 1.8
     CACHE = {}
@@ -2213,6 +2592,9 @@ class Boss(Enemy):
         self.dir = (1.0, 0.0)
         self.start = self.target = (x, y)
         self.volleys = 0
+        self.signature_due = False   # son nefese girince ilk iş imza saldırısı
+        self.quakes = 0
+        self.hunts = 0
 
     def body_rect(self):
         return pygame.Rect(int(self.x) - 11, int(self.y - self.z) - 34, 22, 34)
@@ -2240,23 +2622,47 @@ class Boss(Enemy):
             self.state, self.timer = "roar", 1.5
             self.invuln = 1.5
             self.enraged = True
+        elif self.phase == 2 and self.hp <= self.max_hp / 4:
+            self.phase = 3
+            self.z = 0.0
+            self.fade = 1.0
+            self.state, self.timer = "roar", 1.8
+            self.invuln = 1.8
+            self.enraged = True
+            self.signature_due = True
+
+    def pick_attack(self, opts, signature, game):
+        """Son nefeste imza saldırısı araya girer; aynı saldırı art arda gelmez."""
+        if self.phase == 3:
+            opts.append((signature, 3))
+        opts = [o for o in opts if o[0] != self.last]
+        pick = random.choices([o[0] for o in opts], [o[1] for o in opts])[0]
+        if self.signature_due:
+            self.signature_due = False
+            pick = signature
+        if pick == signature:
+            game.log.append(f"imza {signature}")
+        self.last = pick
+        return pick
 
     def to(self, state, t):
         self.state, self.timer = state, t
 
     def choose(self, game):
         opts = [("leap", 3), ("fan", 3), ("charge", 2)]
-        if self.phase == 2:
+        if self.phase >= 2:
             opts.append(("rain", 2))
             if sum(1 for e in game.enemies if isinstance(e, Ghoul)) < 2:
                 opts.append(("summon", 1))
-        opts = [o for o in opts if o[0] != self.last]
-        pick = random.choices([o[0] for o in opts], [o[1] for o in opts])[0]
-        self.last = pick
-        if pick == "leap":
+        pick = self.pick_attack(opts, "quake", game)
+        if pick == "quake":
+            self.quakes = 3
+            self.to("quake_wind", 0.8)
+            game.sfx.play("roar", 0.6)
+        elif pick == "leap":
             self.to("leap_wind", 0.5)
         elif pick == "fan":
-            self.volleys = 2 if self.phase == 2 else 1
+            self.volleys = 2 if self.phase >= 2 else 1
             self.to("fan_wind", 0.65)
         elif pick == "charge":
             self.to("charge_wind", 0.8)
@@ -2272,7 +2678,7 @@ class Boss(Enemy):
         self.invuln = max(0.0, self.invuln - dt)
         self.timer -= dt
         self.shown += (self.hp - self.shown) * min(1.0, dt * 2.5)
-        sp = (1.35 if self.phase == 2 else 1.0) * self.mul
+        sp = (1.55 if self.phase == 3 else 1.35 if self.phase >= 2 else 1.0) * self.mul
         dx, dy = p.x - self.x, p.y - self.y
         ux, uy = norm(dx, dy)
         arm_to = 0.0
@@ -2306,6 +2712,23 @@ class Boss(Enemy):
             self.next_t -= dt
             if self.next_t <= 0:
                 self.choose(game)
+        elif st == "quake_wind":  # yere vurur: halka halka çatlaklar, tek güvenli yol
+            self.crouch, arm_to = 3, 1.0
+            if self.timer <= 0:
+                gap = random.uniform(0, math.tau)
+                for r in (38, 66, 94, 122):
+                    n = int(r / 7)
+                    for i in range(n):
+                        a = math.tau * i / n
+                        if abs((a - gap + math.pi) % math.tau - math.pi) < 0.6:
+                            continue
+                        hx, hy = self.x + math.cos(a) * r, self.y + math.sin(a) * r * 0.7
+                        if 24 <= hx <= W - 24 and 24 <= hy <= WORLD_H - 14 and not feet_blocked(hx, hy):
+                            game.hazards.append(Hazard(hx, hy, 12, 0.5 + r / 240, "quake"))
+                game.shake = max(game.shake, 7)
+                game.sfx.play("slam")
+                self.quakes -= 1
+                self.to("quake_wind", 0.95) if self.quakes > 0 else self.to("stun", 2.2)
         elif st == "leap_wind":
             self.crouch, arm_to = 3, 0.5
             if self.timer <= 0:
@@ -2324,7 +2747,7 @@ class Boss(Enemy):
                 self.z = 0.0
                 self.x, self.y = self.target
                 self.to("recover", 0.9 if self.phase == 1 else 0.6)
-                if self.phase == 2:  # inişte halka halinde kor
+                if self.phase >= 2:  # inişte halka halinde kor
                     for i in range(8 + 2 * (self.floor - 1)):
                         a = math.tau * i / (8 + 2 * (self.floor - 1))
                         game.bolts.append(Bolt(self.x, self.y - 6, math.cos(a) * BOLT_SPEED,
@@ -2443,7 +2866,7 @@ class Boss(Enemy):
             return
         ox, oy = self.origin()
         cx, cy = ox + 25, oy + 32 + self.crouch
-        hot = self.state in ("fan_wind", "roar") or self.phase == 2
+        hot = self.state in ("fan_wind", "roar") or self.phase >= 2
         pulse = 1 if int(t * 10) % 2 else 0
         pygame.draw.circle(surf, (235, 110, 50), (cx, cy), 4 + (pulse if hot else 0))
         pygame.draw.circle(surf, (255, 205, 100), (cx, cy), 2 + (1 if hot else 0))
@@ -2479,7 +2902,13 @@ class Hazard:
     def draw(self, surf, tt):
         k = 1 - max(0.0, self.t) / self.total
         late = k > 0.7
-        if self.kind == "reap":
+        if self.kind == "web":
+            hot, cold, inner = (240, 240, 240), (170, 175, 170), (100, 110, 100)
+        elif self.kind == "spore":
+            hot, cold, inner = (190, 255, 110), (110, 190, 70), (60, 120, 50)
+        elif self.kind == "quake":
+            hot, cold, inner = (255, 170, 90), (170, 110, 70), (100, 60, 40)
+        elif self.kind == "reap":
             hot, cold, inner = (220, 200, 255), (130, 90, 220), (70, 50, 130)
         elif self.kind == "pillar":
             hot, cold, inner = (255, 200, 90), (220, 90, 30), (130, 40, 20)
@@ -2613,6 +3042,674 @@ class Butterfly(Enemy):
     def light(self):
         hx, hy = self.head()
         return ("ghost", hx, hy)
+
+
+ARCHER_ROWS = [
+    "...kkkk.....", "..kwwwwk....", "..kwkkwk.o..", "..kwwwwk.oo.", "...kwwk..o.o", "..kkwwkk.o.o",
+    ".kwwwwwwwo.o", "..kwwwwk.o.o", "...kwwk..o.o", "..kwkkwk.oo.", "..kw..wk.o..", ".kww..wwk...",
+]
+SHAMAN_ROWS = [
+    "..y.........", ".yyy.kkkk...", "..o.kppppk..", "..o.kpkkpk..", "..o.kpyypk..", "..o.kppppk..",
+    "..okpPPPPpk.", "..okpPPPPpk.", "..okppPPppk.", "..okpPPPPpk.", "..okppppppk.", "..o.kkkkkk..",
+]
+STALKER_ROWS = [
+    "...kkkk...", "..kddddk..", "..kdrdrk..", "..kddddk..", "...kddk...", "..kddddk..", ".kddddddk.",
+    "kd.dddd.dk", "k..dddd..k", "...dddd...", "..kd..dk..", "..kd..dk..", ".kk....kk.",
+]
+SPIDER_ROWS = [
+    "k...kkkkkk...k", ".k.kCCCCCCk.k.", "..kCCcCCcCCk..", "kkkCrCCCCrCkkk", "...kCCCCCCk...",
+    "kkkkccCCcckkkk", "k..kkkkkkkk..k", ".k..k....k..k.", "k...k....k...k",
+]
+
+
+class Archer(Mob):
+    """Kemik Okçu: mesafe korur, kırmızı çizgiyle nişan alıp hızlı ok atar."""
+
+    IMG = None
+    KUL = 2
+
+    def __init__(self, x, y, hp):
+        super().__init__(x, y, hp)
+        if Archer.IMG is None:
+            Archer.IMG = sprite_from_rows(ARCHER_ROWS, MOB_PAL)
+        self.aim = (1.0, 0.0)
+        self.cooldown = random.uniform(1.0, 2.2)
+
+    def body_rect(self):
+        return pygame.Rect(int(self.x) - 5, int(self.y) - 12, 10, 12)
+
+    def update(self, dt, player, game):
+        self.tick(dt)
+        dx, dy = player.x - self.x, player.y - self.y
+        dist = math.hypot(dx, dy)
+        ux, uy = norm(dx, dy)
+        vx = vy = 0.0
+        if dx:
+            self.face = 1 if dx > 0 else -1
+        if self.state == "spawn":
+            if self.timer <= 0:
+                self.state = "walk"
+            return
+        if self.state == "walk":
+            want = -1 if dist < 70 else 1 if dist > 125 else 0
+            vx, vy = ux * want * 34 - uy * 12, uy * want * 34 + ux * 12
+            if self.cooldown <= 0 and dist < 170 and player.hp > 0:
+                self.state, self.timer = "wind", 0.7
+                game.sfx.play("draw", 0.7)
+        elif self.state == "wind":
+            if self.timer > 0.2:
+                self.aim = (ux, uy)
+            if self.timer <= 0:
+                game.bolts.append(Bolt(self.x, self.y - 8, self.aim[0] * 165, self.aim[1] * 165))
+                game.sfx.play("bow", 0.7)
+                self.state, self.cooldown = "walk", random.uniform(1.6, 2.6)
+        elif self.state == "recover":
+            if self.timer <= 0:
+                self.state = "walk"
+        self.physics(vx, vy, dt)
+
+    def draw(self, surf):
+        self.draw_img(surf, Archer.IMG)
+
+    def draw_lit(self, surf, t):
+        if self.state == "wind":
+            for d in range(8, 150, 5):
+                px, py = int(self.x + self.aim[0] * d), int(self.y - 8 + self.aim[1] * d)
+                if 0 <= px < W and 0 <= py < WORLD_H and int(t * 24 + d / 5) % 2:
+                    surf.set_at((px, py), (240, 60, 50))
+
+
+class Shaman(Mob):
+    """Kül Şamanı: dövüşmez, arkadan yakındaki düşmanlara koruma verir. Önce onu öldür."""
+
+    IMG = None
+    KUL = 3
+
+    def __init__(self, x, y, hp):
+        super().__init__(x, y, hp)
+        if Shaman.IMG is None:
+            Shaman.IMG = sprite_from_rows(SHAMAN_ROWS, MOB_PAL)
+        self.cooldown = random.uniform(1.5, 2.5)
+        self.cast = 0.0
+
+    def body_rect(self):
+        return pygame.Rect(int(self.x) - 5, int(self.y) - 12, 10, 12)
+
+    def update(self, dt, player, game):
+        self.tick(dt)
+        self.cast = max(0.0, self.cast - dt)
+        if self.state == "spawn":
+            if self.timer <= 0:
+                self.state = "walk"
+            return
+        ux, uy = norm(player.x - self.x, player.y - self.y)
+        dist = math.hypot(player.x - self.x, player.y - self.y)
+        vx, vy = (-ux * 40, -uy * 40) if dist < 80 else (uy * 16, -ux * 16)
+        if self.cooldown <= 0:
+            allies = [e for e in game.enemies if e is not self and e.active() and not e.passive and not e.ward and
+                      not isinstance(e, (Shaman, Boss))]
+            if allies:
+                m = min(allies, key=lambda e: math.hypot(e.x - self.x, e.y - self.y))
+                m.ward = 1
+                self.cast = 0.4
+                game.effect("zap", self.x, self.y - 10, 0.2, x2=m.x, y2=m.y - 8)
+                game.sfx.play("item", 0.3)
+            self.cooldown = random.uniform(2.6, 3.8)
+        self.physics(vx, vy, dt)
+
+    def draw(self, surf):
+        self.draw_img(surf, Shaman.IMG)
+
+    def draw_lit(self, surf, t):
+        if self.state != "spawn":
+            c = (255, 240, 170) if self.cast > 0 else (255, 200, 90)
+            surf.set_at((int(self.x) - 4, int(self.y) - 12), c)
+
+    def light(self):
+        return ("wisp", self.x - 4, self.y - 12) if self.state != "spawn" else None
+
+
+class Stalker(Mob):
+    """Pusucu: görünmez dolaşır, yanına gelince belirip atılır. Yalnızca gözleri parlar."""
+
+    IMG = None
+    KUL = 3
+
+    def __init__(self, x, y, hp):
+        super().__init__(x, y, hp)
+        if Stalker.IMG is None:
+            Stalker.IMG = sprite_from_rows(STALKER_ROWS, MOB_PAL)
+        self.lunge_dir = (0.0, 0.0)
+
+    def body_rect(self):
+        return pygame.Rect(int(self.x) - 5, int(self.y) - 13, 10, 13)
+
+    def active(self):
+        return self.state not in ("spawn", "hide") and not self.dead
+
+    def touching(self):
+        return self.state == "lunge"
+
+    def on_touch(self):
+        self.state, self.timer = "recover", 0.9
+
+    def update(self, dt, player, game):
+        self.tick(dt)
+        dx, dy = player.x - self.x, player.y - self.y
+        dist = math.hypot(dx, dy)
+        ux, uy = norm(dx, dy)
+        vx = vy = 0.0
+        if dx:
+            self.face = 1 if dx > 0 else -1
+        if self.state == "spawn":
+            if self.timer <= 0:
+                self.state = "hide"
+            return
+        if self.state == "hide":  # görünmezken sütunlardan geçer, takılıp kalmaz
+            if player.hp > 0:
+                self.x = min(W - 24, max(24, self.x + (ux * 62 - uy * 26) * dt))
+                self.y = min(WORLD_H - 18, max(24, self.y + (uy * 62 + ux * 26) * dt))
+            if dist < 44 and player.hp > 0 and not feet_blocked(self.x, self.y):
+                self.state, self.timer = "wind", 0.5
+                game.sfx.play("hiss", 0.8)
+            return
+        elif self.state == "wind":
+            self.lunge_dir = (ux, uy)
+            if self.timer <= 0:
+                self.state, self.timer = "lunge", 0.26
+        elif self.state == "lunge":
+            vx, vy = self.lunge_dir[0] * 190, self.lunge_dir[1] * 190
+            if self.timer <= 0:
+                self.state, self.timer = "recover", 1.1
+        elif self.state == "recover":  # vurulabileceğin an
+            if self.timer <= 0:
+                self.state = "hide"
+        self.physics(vx, vy, dt)
+
+    def draw(self, surf):
+        if self.state != "hide":
+            self.draw_img(surf, Stalker.IMG)
+
+    def draw_lit(self, surf, t):
+        if self.state == "hide" and int(t * 5 + self.anim) % 3:
+            surf.set_at((int(self.x) - 2, int(self.y) - 11), (200, 40, 40))
+            surf.set_at((int(self.x) + 1, int(self.y) - 11), (200, 40, 40))
+
+
+class Spider(Mob):
+    """Ağ Örümceği: uzaktan ağ tükürür; ağın üstünde yavaşlarsın."""
+
+    IMG = None
+    KUL = 2
+
+    def __init__(self, x, y, hp):
+        super().__init__(x, y, hp)
+        if Spider.IMG is None:
+            Spider.IMG = sprite_from_rows(SPIDER_ROWS, MOB_PAL)
+        self.side = random.choice((-1, 1))
+
+    def body_rect(self):
+        return pygame.Rect(int(self.x) - 7, int(self.y) - 9, 14, 9)
+
+    def update(self, dt, player, game):
+        self.tick(dt)
+        dx, dy = player.x - self.x, player.y - self.y
+        ux, uy = norm(dx, dy)
+        if self.state == "spawn":
+            if self.timer <= 0:
+                self.state = "walk"
+            return
+        self.anim += dt * 8
+        vx, vy = -uy * 30 * self.side, ux * 30 * self.side
+        if random.random() < dt * 0.5:
+            self.side *= -1
+        if math.hypot(dx, dy) > 90:
+            vx += ux * 26
+            vy += uy * 26
+        if self.cooldown <= 0 and player.hp > 0:
+            self.cooldown = random.uniform(2.0, 3.0)
+            game.hazards.append(Hazard(player.x, player.y, 20, 0.8, "web"))
+            game.sfx.play("spit", 0.8)
+        self.physics(vx, vy, dt)
+
+    def draw(self, surf):
+        self.draw_img(surf, Spider.IMG, 1 if int(self.anim) % 2 else 0)
+
+
+HOUND_ROWS = ["k...........kk", "kk.........kCk", ".kCCCCCCCCkCCk", ".kCcCCCCCCCrCk", "..kCCCCCCCCCkk",
+              "..kCkkkkkCCk..", "..kCk...kCk...", "..kk....kk...."]
+CHAINER_ROWS = ["...kkkkkk...", "..kSSSSSSk..", "..kSrSSrSk..", "..kSSSSSSk..", "...kbbbbk...", ".kkbbbbbbkk.",
+                "kbbkbbbbkbbk", "kLkkbbbbkkLk", "LkkbbbbbbkkL", "L..kbbbbk..L", "L..kbkkbk...", "...kbkkbk...",
+                "..kkbkkbkk.."]
+TOTEM_ROWS = ["..kkkkkk..", ".koooooOk.", ".korryyOk.", ".koooooOk.", "..kOOOOk..", ".koooooOk.", ".kyrroyOk.",
+              ".koooooOk.", "..kOOOOk..", ".koooooOk.", ".korryrOk.", ".koooooOk.", "kOOOOOOOOk", "kooooooook"]
+SLIME_ROWS = ["...kkkkkk...", "..kPPPPPPk..", ".kPwPPPPPPk.", "kPPPPPPPPPPk", "kPkkPPPPkkPk", "kPPPPPPPPPPk",
+              "kPPPkkkkPPPk", "kpPPPPPPPPpk", ".kkkkkkkkkk."]
+WRAITH_ROWS = ["...kkkkkk...", "..kLLLLLLk..", ".kLLkLLkLLk.", ".kLLLLLLLLk.", ".kLLLkkLLLk.", ".kLLLLLLLLk.",
+               "kLLLLLLLLLLk", "kLLLLLLLLLLk", "kLSLLLLLLSLk", ".kLLSLLSLLk.", "..kLkLLkLk..", "...k.kk.k..."]
+BRUTE_ROWS = ["......kkkkkk......", ".....kwwwwwwk.....", ".....kwrwwrwk.....", ".....kwwwwwwk.....", "....kkwkwkwkkk....",
+              "..kkwwwkkkkwwwkk..", ".kwwwwwwwwwwwwwwk.", "kwwkwwkwwwwkwwkwwk", "kwwkwwwkkkkwwwkwwk", "kwwkkwwwwwwwwkkwwk",
+              "kwwk.kwwwwwwk.kwwk", "kCCk.kwwkkwwk.kCCk", "kCCk.kwwwwwwk.kCCk", ".kk..kwwkkwwk..kk.", "....kwwk..kwwk....",
+              "....kwwk..kwwk....", "...kwwwk..kwwwk...", "...kkkkk..kkkkk..."]
+BAT_ROWS = [["k.......k.", "kk.....kk.", "kbkkkkkbk.", ".kbrkrbk..", "..kbbbk...", "...kkk...."],
+            ["..........", "...kkk....", "kkkbrbkkk.", "kbbkbkbbk.", "k..kkk..k.", ".........."]]
+SPORE_ROWS = ["...kkkkkk...", "..kPPyPPPk..", ".kPPPPPyPPk.", "kPyPPPPPPPPk", "kkkkkkkkkkkk", "...kwwwwk...",
+              "...kwkkwk...", "...kwwwwk...", "..kwwwwwwk.."]
+
+
+class Hound(Mob):
+    """Kül Kurdu: sürüyle gelir, yaklaşınca sıçrar."""
+
+    IMG = None
+    KUL = 2
+
+    def __init__(self, x, y, hp):
+        super().__init__(x, y, hp)
+        if Hound.IMG is None:
+            Hound.IMG = sprite_from_rows(HOUND_ROWS, MOB_PAL)
+        self.dir = (0.0, 0.0)
+        self.z = 0.0
+
+    def body_rect(self):
+        return pygame.Rect(int(self.x) - 7, int(self.y - self.z) - 8, 14, 8)
+
+    def touching(self):
+        return self.state == "leap"
+
+    def on_touch(self):
+        self.state, self.timer = "recover", 0.8
+
+    def update(self, dt, player, game):
+        self.tick(dt)
+        dx, dy = player.x - self.x, player.y - self.y
+        ux, uy = norm(dx, dy)
+        vx = vy = 0.0
+        if self.state == "spawn":
+            if self.timer <= 0:
+                self.state = "run"
+            return
+        if dx:
+            self.face = 1 if dx > 0 else -1
+        if self.state == "run":
+            vx, vy = ux * 68, uy * 68
+            if math.hypot(dx, dy) < 62 and self.cooldown <= 0 and player.hp > 0:
+                self.state, self.timer = "wind", 0.32
+        elif self.state == "wind":
+            self.dir = (ux, uy)
+            if self.timer <= 0:
+                self.state, self.timer = "leap", 0.32
+                game.sfx.play("dash", 0.4)
+        elif self.state == "leap":
+            vx, vy = self.dir[0] * 210, self.dir[1] * 210
+            self.z = math.sin(max(0.0, self.timer) / 0.32 * math.pi) * 10
+            if self.timer <= 0:
+                self.z = 0.0
+                self.state, self.timer = "recover", 0.6
+        elif self.state == "recover":
+            if self.timer <= 0:
+                self.state, self.cooldown = "run", random.uniform(0.6, 1.4)
+        self.physics(vx, vy, dt)
+
+    def draw(self, surf):
+        self.draw_img(surf, Hound.IMG, int(self.z))
+
+
+class Chainer(Mob):
+    """Zincirli Mahkûm: nişan alıp seni zinciriyle kendine çeker."""
+
+    IMG = None
+    KUL = 3
+
+    def __init__(self, x, y, hp):
+        super().__init__(x, y, hp)
+        if Chainer.IMG is None:
+            Chainer.IMG = sprite_from_rows(CHAINER_ROWS, MOB_PAL)
+        self.aim = (1.0, 0.0)
+        self.cooldown = random.uniform(1.4, 2.6)
+
+    def body_rect(self):
+        return pygame.Rect(int(self.x) - 6, int(self.y) - 13, 12, 13)
+
+    def touching(self):
+        return self.state == "walk"
+
+    def on_touch(self):
+        self.state, self.timer = "recover", 0.9
+
+    def update(self, dt, player, game):
+        self.tick(dt)
+        dx, dy = player.x - self.x, player.y - self.y
+        dist = math.hypot(dx, dy)
+        ux, uy = norm(dx, dy)
+        vx = vy = 0.0
+        if self.state == "spawn":
+            if self.timer <= 0:
+                self.state = "walk"
+            return
+        if dx:
+            self.face = 1 if dx > 0 else -1
+        if self.state == "walk":
+            vx, vy = ux * 24, uy * 24
+            if self.cooldown <= 0 and 34 < dist < 130 and player.hp > 0:
+                self.state, self.timer = "wind", 0.75
+                game.sfx.play("draw", 0.6)
+        elif self.state == "wind":
+            if self.timer > 0.25:
+                self.aim = (ux, uy)
+            if self.timer <= 0:
+                along = dx * self.aim[0] + dy * self.aim[1]
+                off = abs(dx * self.aim[1] - dy * self.aim[0])
+                end = (self.x + self.aim[0] * 130, self.y - 8 + self.aim[1] * 130)
+                if 0 < along < 135 and off < 12 and player.dash_t == 0:
+                    player.kb = [-ux * 520, -uy * 520]
+                    end = (player.x, player.y - 8)
+                    game.sfx.play("slam", 0.5)
+                game.effect("zap", self.x, self.y - 8, 0.18, x2=end[0], y2=end[1])
+                self.state, self.cooldown = "walk", random.uniform(2.4, 3.6)
+        elif self.state == "recover":
+            if self.timer <= 0:
+                self.state = "walk"
+        self.physics(vx, vy, dt)
+
+    def draw(self, surf):
+        self.draw_img(surf, Chainer.IMG)
+
+    def draw_lit(self, surf, t):
+        if self.state == "wind":
+            for d in range(8, 130, 6):
+                px, py = int(self.x + self.aim[0] * d), int(self.y - 8 + self.aim[1] * d)
+                if 0 <= px < W and 0 <= py < WORLD_H and int(t * 20 + d / 6) % 2:
+                    surf.set_at((px, py), (190, 195, 220))
+
+
+class Totem(Mob):
+    """Kor Totemi: yerinden kıpırdamaz, dönerek kor saçar."""
+
+    IMG = None
+    KUL = 3
+
+    def __init__(self, x, y, hp):
+        super().__init__(x, y, hp)
+        if Totem.IMG is None:
+            Totem.IMG = sprite_from_rows(TOTEM_ROWS, MOB_PAL)
+        self.spin = random.uniform(0, math.tau)
+        self.cooldown = random.uniform(1.0, 2.0)
+
+    def body_rect(self):
+        return pygame.Rect(int(self.x) - 5, int(self.y) - 14, 10, 14)
+
+    def update(self, dt, player, game):
+        self.tick(dt)
+        self.kb = [0.0, 0.0]
+        if self.state == "spawn":
+            if self.timer <= 0:
+                self.state = "idle"
+            return
+        if self.cooldown <= 0 and player.hp > 0:
+            self.cooldown = 2.2
+            self.spin += 0.35
+            for i in range(6):
+                a = self.spin + i * math.tau / 6
+                game.bolts.append(Bolt(self.x, self.y - 10, math.cos(a) * BOLT_SPEED, math.sin(a) * BOLT_SPEED, h=10))
+            game.sfx.play("shoot", 0.5)
+
+    def draw(self, surf):
+        self.draw_img(surf, Totem.IMG)
+
+    def light(self):
+        return ("wisp", self.x, self.y - 10) if self.state != "spawn" else None
+
+
+class Slime(Mob):
+    """Kül Balçığı: zıplar, ölünce ikiye bölünür."""
+
+    IMGS = {}
+    KUL = 1
+
+    def __init__(self, x, y, hp, size=2):
+        super().__init__(x, y, hp)
+        self.size = size
+        if size not in Slime.IMGS:
+            base = sprite_from_rows(SLIME_ROWS, MOB_PAL)
+            base.fill((130, 255, 170, 255), special_flags=pygame.BLEND_RGBA_MULT)
+            Slime.IMGS[size] = base if size == 2 else pygame.transform.scale(base, (8, 6))
+        self.dir = (0.0, 0.0)
+        self.z = 0.0
+        self.cooldown = random.uniform(0.4, 1.0)
+
+    def body_rect(self):
+        w = 12 if self.size == 2 else 8
+        return pygame.Rect(int(self.x) - w // 2, int(self.y - self.z) - 9, w, 9)
+
+    def touching(self):
+        return self.state == "hop"
+
+    def on_touch(self):
+        self.state, self.timer = "wait", 0.7
+
+    def on_death(self, game):
+        if self.size == 2:
+            for side in (-1, 1):
+                x = self.x + side * 8
+                if not feet_blocked(x, self.y):
+                    game.spawn_queue.append(Slime(x, self.y, 1, 1))
+
+    def update(self, dt, player, game):
+        self.tick(dt)
+        vx = vy = 0.0
+        if self.state == "spawn":
+            if self.timer <= 0:
+                self.state = "wait"
+            return
+        if self.state == "wait":
+            self.z = 0.0
+            if self.cooldown <= 0 and player.hp > 0:
+                self.dir = norm(player.x - self.x, player.y - self.y)
+                self.state, self.timer = "hop", 0.4
+        elif self.state == "hop":
+            vx, vy = self.dir[0] * 105, self.dir[1] * 105
+            self.z = math.sin(max(0.0, self.timer) / 0.4 * math.pi) * 9
+            if self.timer <= 0:
+                self.z = 0.0
+                self.state, self.cooldown = "wait", random.uniform(0.35, 0.8)
+        elif self.state == "recover":
+            if self.timer <= 0:
+                self.state = "wait"
+        self.physics(vx, vy, dt)
+
+    def draw(self, surf):
+        self.draw_img(surf, Slime.IMGS[self.size], int(self.z))
+
+
+class Wraith(Mob):
+    """Hayalet: duvarlardan geçer, solunca vurulamaz. Belirdiği anı kolla."""
+
+    IMG = None
+    KUL = 3
+
+    def __init__(self, x, y, hp):
+        super().__init__(x, y, hp)
+        if Wraith.IMG is None:
+            Wraith.IMG = sprite_from_rows(WRAITH_ROWS, MOB_PAL)
+        self.phase = random.uniform(0, 2)
+        self.expose = 0.0   # vurduktan sonra açıkta kaldığı süre
+
+    def body_rect(self):
+        return pygame.Rect(int(self.x) - 6, int(self.y) - 16, 12, 12)
+
+    def faded(self):
+        return self.expose <= 0 and self.phase % 3.2 > 2.0
+
+    def active(self):
+        return self.state != "spawn" and not self.dead and not self.faded()
+
+    def touching(self):
+        return self.state == "drift" and not self.faded() and self.expose <= 0
+
+    def on_touch(self):
+        self.expose = 1.6  # vurunca geri çekilir ve vurulabilir kalır
+
+    def update(self, dt, player, game):
+        self.tick(dt)
+        if self.state == "spawn":
+            if self.timer <= 0:
+                self.state = "drift"
+            return
+        if self.state == "recover":
+            self.state = "drift"
+        self.phase += dt
+        self.expose = max(0.0, self.expose - dt)
+        ux, uy = norm(player.x - self.x, player.y - self.y)
+        self.face = 1 if ux > 0 else -1
+        sp = -22 if self.expose > 0 else 46 if self.faded() else 30
+        self.x = min(W - 18, max(18, self.x + (ux * sp + self.kb[0]) * dt))
+        self.y = min(WORLD_H - 10, max(26, self.y + (uy * sp + self.kb[1]) * dt))
+        self.kb = [self.kb[0] * 0.85, self.kb[1] * 0.85]
+
+    def draw(self, surf):
+        img = Wraith.IMG.copy()
+        img.set_alpha(50 if self.faded() else 190)
+        if self.flash > 0:
+            img = white_of(Wraith.IMG)
+        if self.face < 0:
+            img = pygame.transform.flip(img, True, False)
+        surf.blit(img, (int(self.x) - 6, int(self.y) - 18 + int(math.sin(self.phase * 4) * 1.5)))
+
+    def light(self):
+        return None if self.faded() or self.state == "spawn" else ("ghost", self.x, self.y - 10)
+
+
+class Brute(Mob):
+    """Kemik Dev: ağır ve dayanıklı, yere vurup şok yayar. İtilmez."""
+
+    IMG = None
+    KUL = 7
+
+    def __init__(self, x, y, hp):
+        super().__init__(x, y, hp)
+        if Brute.IMG is None:
+            Brute.IMG = sprite_from_rows(BRUTE_ROWS, MOB_PAL)
+        self.cooldown = random.uniform(1.0, 2.0)
+
+    def body_rect(self):
+        return pygame.Rect(int(self.x) - 9, int(self.y) - 18, 18, 18)
+
+    def update(self, dt, player, game):
+        self.tick(dt)
+        self.kb = [self.kb[0] * 0.2, self.kb[1] * 0.2]
+        dx, dy = player.x - self.x, player.y - self.y
+        ux, uy = norm(dx, dy)
+        vx = vy = 0.0
+        if self.state == "spawn":
+            if self.timer <= 0:
+                self.state = "walk"
+            return
+        if dx:
+            self.face = 1 if dx > 0 else -1
+        if self.state == "walk":
+            vx, vy = ux * 20, uy * 20
+            if math.hypot(dx, dy) < 52 and self.cooldown <= 0 and player.hp > 0:
+                self.state, self.timer = "slam", 0.8
+                game.hazards.append(Hazard(self.x, self.y, 40, 0.8, "slam"))
+                game.sfx.play("charge", 0.6)
+        elif self.state == "slam":
+            if self.timer <= 0:
+                self.state, self.timer = "rest", 1.1
+        elif self.state in ("rest", "recover"):
+            if self.timer <= 0:
+                self.state, self.cooldown = "walk", random.uniform(1.0, 2.0)
+        self.physics(vx, vy, dt)
+
+    def draw(self, surf):
+        self.draw_img(surf, Brute.IMG, 2 if self.state == "slam" and self.timer < 0.3 else 0)
+
+
+class Bat(Mob):
+    """Mahzen Yarasası: sürüyle, düzensiz dalışlarla gelir."""
+
+    FRAMES = None
+
+    def __init__(self, x, y, hp=1):
+        super().__init__(x, y, hp)
+        if Bat.FRAMES is None:
+            Bat.FRAMES = [sprite_from_rows(f, MOB_PAL) for f in BAT_ROWS]
+        self.ph = random.uniform(0, 6)
+        self.dive = 0.0
+
+    def body_rect(self):
+        return pygame.Rect(int(self.x) - 5, int(self.y) - 14, 10, 7)
+
+    def touching(self):
+        return self.dive > 0
+
+    def on_touch(self):
+        self.dive = 0.0
+        self.cooldown = 1.2
+
+    def update(self, dt, player, game):
+        self.tick(dt)
+        if self.state == "spawn":
+            if self.timer <= 0:
+                self.state = "fly"
+            return
+        if self.state == "recover":
+            self.state = "fly"
+        self.ph += dt * 6
+        self.anim += dt * 14
+        dx, dy = player.x - self.x, player.y - self.y
+        ux, uy = norm(dx, dy)
+        self.dive = max(0.0, self.dive - dt)
+        if self.dive > 0:
+            vx, vy = ux * 120, uy * 120
+        else:
+            vx, vy = -uy * math.sin(self.ph) * 60 + ux * 22, ux * math.sin(self.ph) * 60 + uy * 22
+            if self.cooldown <= 0 and math.hypot(dx, dy) < 80 and player.hp > 0:
+                self.dive, self.cooldown = 0.5, random.uniform(1.4, 2.6)
+        self.physics(vx, vy, dt)
+
+    def draw(self, surf):
+        pygame.draw.ellipse(surf, (8, 6, 10), (int(self.x) - 3, int(self.y) - 1, 6, 2))
+        img = Bat.FRAMES[int(self.anim) % 2]
+        if self.flash > 0:
+            img = white_of(img)
+        surf.blit(img, (int(self.x) - 5, int(self.y) - 14))
+
+
+class Spore(Mob):
+    """Çürük Mantar: yavaş sürünür, yakınına zehir saçar; ölünce zehir bulutu bırakır."""
+
+    IMG = None
+    KUL = 2
+
+    def __init__(self, x, y, hp):
+        super().__init__(x, y, hp)
+        if Spore.IMG is None:
+            Spore.IMG = sprite_from_rows(SPORE_ROWS, MOB_PAL)
+
+    def body_rect(self):
+        return pygame.Rect(int(self.x) - 6, int(self.y) - 9, 12, 9)
+
+    def on_death(self, game):
+        game.hazards.append(Hazard(self.x, self.y, 24, 0.55, "spore"))
+
+    def update(self, dt, player, game):
+        self.tick(dt)
+        if self.state == "spawn":
+            if self.timer <= 0:
+                self.state = "walk"
+            return
+        ux, uy = norm(player.x - self.x, player.y - self.y)
+        if self.cooldown <= 0 and player.hp > 0:
+            self.cooldown = random.uniform(2.4, 3.4)
+            for _ in range(2):
+                hx, hy = player.x + random.uniform(-26, 26), player.y + random.uniform(-16, 16)
+                if not feet_blocked(hx, hy):
+                    game.hazards.append(Hazard(hx, hy, 15, 0.85, "spore"))
+            game.sfx.play("spit", 0.5)
+        self.physics(ux * 12, uy * 12, dt)
+
+    def draw(self, surf):
+        self.draw_img(surf, Spore.IMG)
 
 
 class Crawler(Mob):
@@ -3036,14 +4133,16 @@ class PyreBoss(Boss):
 
     def choose(self, game):
         opts = [("spiral", 3), ("pillars", 3), ("blink", 2)]
-        if self.phase == 2:
+        if self.phase >= 2:
             opts.append(("orbs", 3))
             if sum(1 for e in game.enemies if isinstance(e, Wisp)) < 2:
                 opts.append(("summon", 1))
-        opts = [o for o in opts if o[0] != self.last]
-        pick = random.choices([o[0] for o in opts], [o[1] for o in opts])[0]
-        self.last = pick
-        if pick == "spiral":
+        pick = self.pick_attack(opts, "sun", game)
+        if pick == "sun":
+            self.start = (self.x, self.y)
+            self.to("sun_rise", 0.9)
+            game.sfx.play("roar", 0.6)
+        elif pick == "spiral":
             self.to("spiral_wind", 0.6)
         elif pick == "pillars":
             self.to("pillar_wind", 0.7)
@@ -3063,7 +4162,7 @@ class PyreBoss(Boss):
         self.timer -= dt
         self.bob += dt * 2.5
         self.shown += (self.hp - self.shown) * min(1.0, dt * 2.5)
-        sp = (1.3 if self.phase == 2 else 1.0) * self.mul
+        sp = (1.5 if self.phase == 3 else 1.3 if self.phase >= 2 else 1.0) * self.mul
         dx, dy = p.x - self.x, p.y - self.y
         dist = math.hypot(dx, dy)
         ux, uy = norm(dx, dy)
@@ -3102,6 +4201,33 @@ class PyreBoss(Boss):
             self.next_t -= dt
             if self.next_t <= 0:
                 self.choose(game)
+        elif st == "sun_rise":  # odanın ortasına süzülür
+            arm_to = 1.0
+            k = 1 - max(0.0, self.timer) / 0.9
+            self.x = self.start[0] + (W / 2 - self.start[0]) * k
+            self.y = self.start[1] + (84 - self.start[1]) * k
+            if self.timer <= 0:
+                self.shots = 0
+                self.to("sun", 4.2)
+                game.sfx.play("charge")
+        elif st == "sun":  # kor güneşi: seni çeker, boşluklu halkalar saçar; yanına giden vurabilir
+            arm_to = 1.0
+            game.shake = max(game.shake, 1.5)
+            if p.hp > 0:
+                p.kb[0] -= ux * 620 * dt
+                p.kb[1] -= uy * 620 * dt
+            elapsed = 4.2 - self.timer
+            while self.shots * 0.8 <= elapsed:
+                n, gap = 16, random.randrange(16)
+                for i in range(n):
+                    if min((i - gap) % n, (gap - i) % n) > 1:
+                        a = math.tau * i / n
+                        game.bolts.append(Bolt(cx, cy, math.cos(a) * BOLT_SPEED * 0.9,
+                                               math.sin(a) * BOLT_SPEED * 0.9, h=26))
+                self.shots += 1
+                game.sfx.play("shoot", 0.5)
+            if self.timer <= 0:
+                self.to("recover", 2.0)
         elif st == "spiral_wind":
             arm_to = 1.0
             if self.timer <= 0:
@@ -3127,7 +4253,7 @@ class PyreBoss(Boss):
             arm_to = 0.6
             if self.timer <= 0:  # oyuncuya doğru yürüyen ateş sütunları
                 lines = [math.atan2(dy, dx)]
-                if self.phase == 2:
+                if self.phase >= 2:
                     lines += [lines[0] - 0.5, lines[0] + 0.5]
                 for la in lines:
                     for i in range(7 + self.floor // 2):
@@ -3239,6 +4365,17 @@ class PyreBoss(Boss):
             r = 2 + (1 if hot and int(t * 12) % 2 else 0)
             pygame.draw.circle(surf, (235, 110, 50), (int(hx), int(hy)), r + 1)
             pygame.draw.circle(surf, (255, 230, 150), (int(hx), int(hy)), r - 1 if r > 1 else 1)
+        if self.state == "sun":  # kor güneşi ve içeri akan kıvılcımlar
+            cx, cy = (int(v) for v in self.core())
+            r = 13 + int(t * 8) % 3
+            pygame.draw.circle(surf, (235, 90, 40), (cx, cy), r + 3, 1)
+            pygame.draw.circle(surf, (255, 170, 70), (cx, cy), r, 2)
+            for j in range(14):
+                a = j * math.tau / 14 + t * 0.6
+                d = 90 - (t * 80 + j * 23) % 76
+                px, py = int(cx + math.cos(a) * d), int(cy + math.sin(a) * d * 0.7)
+                if 0 <= px < W and 0 <= py < WORLD_H:
+                    surf.set_at((px, py), (255, 210, 120))
         if self.state in ("spiral_wind", "orb_wind"):  # toplanan kor halkası
             k = 1 - max(0.0, self.timer) / 0.6
             cx, cy = self.core()
@@ -3356,12 +4493,14 @@ class ShadeBoss(Boss):
 
     def choose(self, game):
         opts = [("reap", 3), ("dash", 3), ("vanish", 3)]
-        if self.phase == 2 and sum(1 for e in game.enemies if isinstance(e, ShadeClone)) == 0:
+        if self.phase >= 2 and sum(1 for e in game.enemies if isinstance(e, ShadeClone)) == 0:
             opts.append(("clones", 2))
-        opts = [o for o in opts if o[0] != self.last]
-        pick = random.choices([o[0] for o in opts], [o[1] for o in opts])[0]
-        self.last = pick
-        if pick == "reap":
+        pick = self.pick_attack(opts, "hunt", game)
+        if pick == "hunt":
+            self.hunts = 3
+            self.to("vanish", 0.4)
+            game.sfx.play("roar", 0.5)
+        elif pick == "reap":
             self.to("approach", 1.4)
         elif pick == "dash":
             self.dashes = (2 if self.phase == 1 else 3) + (self.floor > 3)
@@ -3383,7 +4522,7 @@ class ShadeBoss(Boss):
         self.invuln = max(0.0, self.invuln - dt)
         self.timer -= dt
         self.shown += (self.hp - self.shown) * min(1.0, dt * 2.5)
-        sp = (1.25 if self.phase == 2 else 1.0) * self.mul
+        sp = (1.45 if self.phase == 3 else 1.25 if self.phase >= 2 else 1.0) * self.mul
         dx, dy = p.x - self.x, p.y - self.y
         dist = math.hypot(dx, dy)
         ux, uy = norm(dx, dy)
@@ -3391,7 +4530,7 @@ class ShadeBoss(Boss):
         shadow = [(52, 42, 84), (30, 24, 50), (80, 66, 120)]
         pose = 0
         # öfkede oda kararır
-        want_dark = 0.6 if self.phase == 2 else 0.25
+        want_dark = 0.85 if self.hunts else 0.6 if self.phase >= 2 else 0.25
         game.darkness += (want_dark - game.darkness) * min(1.0, dt * 1.5)
 
         if st == "spawn":
@@ -3439,7 +4578,11 @@ class ShadeBoss(Boss):
         elif st == "reap":
             pose = 2
             if self.timer <= 0:
-                self.to("recover", 0.75 if self.phase == 1 else 0.5)
+                if self.hunts:  # karanlık av: üç kez arkandan gelir, sonra açıkta kalır
+                    self.hunts -= 1
+                    self.to("vanish", 0.3) if self.hunts else self.to("recover", 1.8)
+                else:
+                    self.to("recover", 0.75 if self.phase == 1 else 0.5)
         elif st == "dash_wind":
             pose = 1
             if self.timer > 0.2:
@@ -3472,7 +4615,7 @@ class ShadeBoss(Boss):
                               speed=40, life=0.5, grav=-50)
             if self.timer <= 0:
                 self.fade = 0.0
-                self.to("lurk", 0.8 if self.phase == 1 else 0.55)
+                self.to("lurk", 0.42 if self.hunts else 0.8 if self.phase == 1 else 0.55)
         elif st == "lurk":  # görünmez; oyuncunun arkasına süzülür
             back = -p.face if p.face else 1
             tx, ty = self.clamp(p.x + back * 26, p.y)
@@ -3716,6 +4859,10 @@ class Ash:
         self.rng = rng
         self.parts = []
         self.haven = False
+        self.biome = "kul"
+
+    def set_biome(self, key):
+        self.biome = key
 
     def set_haven(self, on):
         if on != self.haven:
@@ -3749,10 +4896,13 @@ class Ash:
                 if int(y) % 6 < 3 and int(x) + 1 < W:
                     surf.set_at((int(x) + 1, int(y)), kind)
                 continue
+            hot, cold = {"kul": ((230, 110, 50), (70, 64, 76)), "kor": ((255, 150, 60), (150, 60, 30)),
+                         "kemik": ((210, 205, 170), (90, 90, 76)), "golge": ((170, 130, 255), (60, 54, 110)),
+                         "ag": ((170, 240, 120), (70, 110, 70))}[self.biome]
             if kind:
-                c = (230, 110, 50) if life > 2 else (120, 50, 30)
+                c = hot if life > 2 else tuple(v // 2 for v in hot)
             else:
-                c = (70, 64, 76)
+                c = cold
             surf.set_at((int(x), int(y)), c)
 
 
@@ -3769,18 +4919,36 @@ def draw_torch(surf, tx, ty, t):
 
 def draw_door(surf, room, t):
     """Çıkış kapısının demir parmaklıkları; açılınca yukarı çekilir."""
-    x = room.door_col * TILE
     drop = int(13 * (1 - room.door_anim))
-    if room.door_anim > 0:  # ötesinden gelen soğuk ışıltı
-        for i in range(3):
-            yy = 4 + i * 4 + int(t * 6 + i) % 3
-            surf.set_at((x + 5 + (i * 3) % 6, yy), (90, 80, 140))
-    for bx in range(4, 13, 3):
-        if drop > 0:
-            pygame.draw.line(surf, (70, 64, 80), (x + bx, 3), (x + bx, 2 + drop))
-            surf.set_at((x + bx, 2 + drop), (40, 36, 46))
-    if drop > 4:
-        pygame.draw.line(surf, (70, 64, 80), (x + 3, 2 + drop // 2), (x + 12, 2 + drop // 2))
+    for col in room.door_cols():
+        x = col * TILE
+        if room.door_anim > 0:  # ötesinden gelen soğuk ışıltı
+            for i in range(3):
+                yy = 4 + i * 4 + int(t * 6 + i) % 3
+                surf.set_at((x + 5 + (i * 3) % 6, yy), (90, 80, 140))
+        for bx in range(4, 13, 3):
+            if drop > 0:
+                pygame.draw.line(surf, (70, 64, 80), (x + bx, 3), (x + bx, 2 + drop))
+                surf.set_at((x + bx, 2 + drop), (40, 36, 46))
+        if drop > 4:
+            pygame.draw.line(surf, (70, 64, 80), (x + 3, 2 + drop // 2), (x + 12, 2 + drop // 2))
+
+
+ROUTE_LABELS = {"combat": ("DÖVÜŞ", (230, 150, 110)), "hazine": ("SANDIK", (255, 215, 120)),
+                "dukkan": ("TÜCCAR", (200, 170, 235)), "tansi": ("TANSİ", (255, 180, 100)),
+                "lanet": ("LANET", (210, 130, 240)), "kusatma": ("KUŞATMA", (255, 120, 90)),
+                "rest": ("SUNAK", (255, 190, 110)), "ani": ("ANI", (190, 205, 255)), "boss": ("BEKÇİ", (255, 80, 70))}
+
+
+def draw_routes(surf, font, room):
+    """Açık kapıların üstünde sonraki odanın türü yazar."""
+    if not room.door_open:
+        return
+    for col, kind in room.exits.items():
+        if kind in ROUTE_LABELS:
+            label, c = ROUTE_LABELS[kind]
+            x = min(max(col * TILE + 8, 20), W - 20)
+            text(surf, font, label, x, 16, c, center=True)
 
 
 def draw_altar_fire(surf, room, t):
@@ -3933,69 +5101,107 @@ def text(surf, font, s, x, y, col, center=False, shadow=True):
     return img.get_width()
 
 
+WEAPON_ICONS = {}
+
+
+def weapon_icon(key):
+    if key not in WEAPON_ICONS:
+        img = sprite_from_rows(WEAPON_SPRITES[key], WPAL)
+        k = min(10 / img.get_width(), 12 / img.get_height(), 1.0)
+        WEAPON_ICONS[key] = pygame.transform.scale(img, (max(1, int(img.get_width() * k)), max(1, int(img.get_height() * k))))
+    return WEAPON_ICONS[key]
+
+
 def draw_hud(surf, font, game):
-    player = game.player
+    player, room = game.player, game.room
     top = WORLD_H
-    pygame.draw.rect(surf, (8, 6, 12), (0, top, W, H - top))
-    pygame.draw.line(surf, (44, 38, 60), (0, top), (W, top))
-    x = 6
+    now = pygame.time.get_ticks() / 1000
+    pygame.draw.rect(surf, (12, 9, 17), (0, top, W, H - top))
+    pygame.draw.rect(surf, (18, 13, 24), (0, top + 2, W, 6))
+    # üstte ustalık çubuğu: silahın gelişimi
+    lv = player.mastery
+    lo = MASTERY_KILLS[lv - 1] if lv else 0
+    hi = MASTERY_KILLS[lv] if lv < len(MASTERY_KILLS) else None
+    k = 1.0 if hi is None else (player.mastery_kills - lo) / (hi - lo)
+    pygame.draw.rect(surf, (34, 26, 42), (0, top, W, 2))
+    pygame.draw.rect(surf, (255, 200, 100) if hi is None else (220, 140, 70), (0, top, int(W * k), 2))
+    # canlar: kalabalıksa iki sıra, az kalınca atar
+    low = player.hp <= 2 and int(now * 4) % 2
     for i in range(player.max_hp):
         full = i < player.hp
+        hx0, hy0 = 5 + (i % 10) * 8, top + 3 + (i // 10) * 6
         for y, row in enumerate(HEART):
             for hx, ch in enumerate(row):
                 if ch == ".":
                     continue
-                c = (10, 8, 14) if ch == "k" else (200, 40, 50) if full else (40, 30, 44)
-                surf.set_at((x + i * 8 + hx, top + 3 + y), c)
+                c = (10, 8, 14) if ch == "k" else ((255, 90, 90) if low else (214, 44, 54)) if full else (44, 32, 48)
+                surf.set_at((hx0 + hx, hy0 + y), c)
+    for j in range(player.shield):
+        pygame.draw.rect(surf, (190, 196, 220), (5 + j * 5, top + 10, 4, 4))
+    # atılma
     ready = 1 - player.dash_cd / (DASH_COOLDOWN * player.dash_cd_mul)
-    pygame.draw.rect(surf, (30, 24, 40), (6, top + 13, 30, 3))
-    pygame.draw.rect(surf, (170, 160, 200) if ready >= 1 else (70, 64, 90), (6, top + 13, int(30 * ready), 3))
-    if player.shield > 0:
-        for j in range(player.shield):
-            pygame.draw.rect(surf, (190, 196, 220), (40 + j * 5, top + 12, 4, 5))
-    for j in range(3):  # ustalık seviyesi
-        pygame.draw.rect(surf, (255, 200, 110) if j < player.mastery else (44, 36, 52), (40 + j * 5, top + 3, 4, 4))
-    if game.spirit:
-        pygame.draw.rect(surf, SPIRITS[game.spirit]["col"], (56, top + 3, 4, 4))
-    if game.combo >= 5:
-        col = (255, 120, 70) if game.combo >= 25 else (255, 200, 110) if game.combo >= 10 else (210, 200, 220)
-        text(surf, font, f"KOMBO {game.combo}", 6, 6, col)
-        if game.combo_bonus():
-            text(surf, font, f"hasar +{game.combo_bonus()}", 6, 16, (240, 170, 110))
-    sx = 100
+    pygame.draw.rect(surf, (30, 24, 40), (5, top + 16, 78, 2))
+    pygame.draw.rect(surf, (190, 180, 230) if ready >= 1 else (84, 76, 108), (5, top + 16, int(78 * ready), 2))
+    # silah, ruh rengi ve ustalık seviyesi
+    edge = SPIRITS[game.spirit]["col"] if game.spirit else (70, 58, 84)
+    pygame.draw.rect(surf, (24, 18, 30), (86, top + 3, 14, 15))
+    pygame.draw.rect(surf, edge, (86, top + 3, 14, 15), 1)
+    wi = weapon_icon(player.weapon)
+    surf.blit(wi, (93 - wi.get_width() // 2, top + 4))
+    for j in range(3):
+        surf.set_at((90 + j * 3, top + 16), (255, 210, 120) if j < lv else (60, 50, 70))
+    # yetenekler
+    sx = 104
     for j, (sk, name, cd) in enumerate(player.wp["skills"]):
-        draw_skill_box(surf, sx + j * 17, top + 3, sk, SKILL_KEYS[j], player.skill_cd[j], cd * player.cdr, 0)
-    x = sx + 3 * 17 + 6
+        draw_skill_box(surf, sx + j * 16, top + 4, sk, SKILL_KEYS[j], player.skill_cd[j], cd * player.cdr, 0)
+    x = sx + 3 * 16 + 2
     if player.has_beam:
-        draw_skill_box(surf, sx + 3 * 17, top + 3, "isin", "O", player.skill_cd[3], BEAM_SKILL[2] * player.cdr, 0)
-        x += 17
-    for n, (key, lvl) in enumerate(player.boons.items()):
-        if n >= 6:
-            break
-        surf.blit(icon(key), (x, top + 4))
-        for j in range(lvl):
-            surf.set_at((x + 1 + j * 2, top + 15), (230, 150, 80))
-        x += 12
-    room = game.room
-    label = "TANSİ" if room.tansi else {"rest": "KOR SUNAĞI", "boss": "BEKÇİ", "haven": "SIĞINAK", "ani": "ANI", "dukkan": "TÜCCAR",
-             "hazine": "HAZİNE", "lanet": "LANETLİ SUNAK", "kusatma": "KUŞATMA"}.get(room.kind, f"KAT {room.floor} · {room.idx}/{FLOOR_LEN}")
-    img = font.render(label, False, (255, 150, 190) if room.kind in ("haven", "ani") else (180, 110, 90))
-    surf.blit(img, (W - img.get_width() - 6, top + 5))
-    # Öykü'nün isteği: elde değilse sönük, eldeyse parlak
+        draw_skill_box(surf, x, top + 4, "isin", "O", player.skill_cd[3], BEAM_SKILL[2] * player.cdr, 0)
+        x += 18
+    # sağ taraf: yer, oda ilerlemesi, kül, istek
+    label = "TANSİ" if room.tansi else {"rest": "SUNAK", "boss": "BEKÇİ", "haven": "SIĞINAK", "ani": "ANI",
+                                        "dukkan": "TÜCCAR", "hazine": "HAZİNE", "lanet": "LANET",
+                                        "kusatma": "KUŞATMA"}.get(room.kind, f"KAT {room.floor}")
+    img = font.render(label, False, (255, 150, 190) if room.kind in ("haven", "ani") else (200, 130, 100))
+    surf.blit(img, (W - img.get_width() - 5, top + 1))
+    if room.kind != "haven":
+        length = game.floor_len(room.floor)
+        for i in range(length):
+            n = i + 1
+            px = W - 6 - (length - i - 1) * 4
+            c = (255, 80, 70) if n == length else (255, 255, 240) if n == room.idx and int(now * 3) % 2 else \
+                (240, 170, 90) if n <= room.idx else (54, 44, 62)
+            pygame.draw.rect(surf, c, (px - 1, top + 14, 3, 3))
+    right = W - img.get_width() - 10
     if game.quest is not None and game.quest < len(ITEMS) and not game.endless:
         ic = item_icon(game.quest)
-        qx = W - img.get_width() - 20
+        right -= 14
         if game.carrying is None:
             ic = ic.copy()
             ic.fill((90, 90, 90, 255), special_flags=pygame.BLEND_RGBA_MULT)
-        surf.blit(ic, (qx, top + 5))
-        pygame.draw.rect(surf, (255, 150, 190) if game.carrying is not None else (60, 50, 70),
-                         (qx - 2, top + 3, 13, 13), 1)
-    kx = W - img.get_width() - (24 if game.quest is not None and game.quest < len(ITEMS) and not game.endless
-                                 else 10)
-    kw = draw_kul(surf, font, kx, top + 5, game.save["kul"], right=True)
+        surf.blit(ic, (right + 2, top + 4))
+        pygame.draw.rect(surf, (255, 150, 190) if game.carrying is not None else (60, 50, 70), (right, top + 2, 13, 13), 1)
+        right -= 3
+    kw = draw_kul(surf, font, right, top + 3, game.save["kul"], right=True)
+    right -= kw + 6
+    # güçler: sığan kadarı, en yenileri
+    room_for = max(0, (right - x) // 11)
+    items = list(player.boons.items())[-room_for:] if room_for else []
+    for key, lvl in items:
+        surf.blit(icon(key), (x, top + 5))
+        for j in range(min(lvl, 4)):
+            surf.set_at((x + 1 + j * 2, top + 15), (230, 150, 80))
+        x += 11
     if game.sfx.muted:
-        text(surf, font, "SES KAPALI", kx - kw - 52, top + 5, (90, 80, 100), shadow=False)
+        text(surf, font, "SES KAPALI", W // 2, top - 12, (120, 110, 130), center=True)
+    # kombo: süre çubuğuyla
+    if game.combo >= 5:
+        col = (255, 120, 70) if game.combo_bonus() >= 2 else (255, 200, 110) if game.combo_bonus() else (210, 200, 220)
+        text(surf, font, f"KOMBO {game.combo}", 6, 4, col)
+        pygame.draw.rect(surf, (30, 22, 36), (6, 15, 46, 2))
+        pygame.draw.rect(surf, col, (6, 15, int(46 * game.combo_t / 2.6), 2))
+        if game.combo_bonus():
+            text(surf, font, f"hasar +{game.combo_bonus()}", 6, 18, (240, 170, 110))
 
 
 ITEM_ICONS = {}
@@ -4008,14 +5214,15 @@ def item_icon(i):
 
 
 def draw_boss_bar(surf, font, boss, t):
-    text(surf, font, boss.name, W // 2, 18, (230, 90, 70) if boss.phase == 2 else (200, 180, 190), center=True)
+    text(surf, font, boss.name, W // 2, 18, (230, 90, 70) if boss.phase >= 2 else (200, 180, 190), center=True)
     x, y, w = 80, 30, 160
     pygame.draw.rect(surf, (8, 6, 10), (x - 1, y - 1, w + 2, 6))
     pygame.draw.rect(surf, (40, 16, 20), (x, y, w, 4))
     pygame.draw.rect(surf, (230, 220, 200), (x, y, int(w * max(0.0, boss.shown) / boss.max_hp), 4))
-    col = (255, 110, 50) if boss.phase == 2 and int(t * 6) % 2 else (190, 36, 44)
+    col = (255, 110, 50) if boss.phase >= 2 and int(t * 6) % 2 else (190, 36, 44)
     pygame.draw.rect(surf, col, (x, y, int(w * max(0, boss.hp) / boss.max_hp), 4))
     surf.set_at((x + w // 2, y - 1), (255, 220, 140))  # öfke eşiği
+    surf.set_at((x + w // 4, y - 1), (255, 90, 70))    # son nefes eşiği
 
 
 def wrap(font, s, width):
@@ -4069,7 +5276,7 @@ def draw_ending(surf, big, font, game, t):
     for i in range(3):
         surf.blit(pygame.transform.scale(item_icon(i), (18, 18)), (W // 2 - 40 + i * 28, 30))
     text(surf, big, "LANET ÇÖZÜLDÜ", W // 2, 56, (190, 60, 110), center=True)
-    text(surf, font, "Öykü'nün istediği her şey artık onda.", W // 2, 78, (90, 50, 80), center=True)
+    text(surf, font, f"{game.hero_name}, Öykü'nün istediği her şey artık onda.", W // 2, 78, (90, 50, 80), center=True)
     text(surf, font, f"{game.kills} hortlak susturuldu · {game.room.depth} oda", W // 2, 92, (110, 80, 100),
          center=True)
     if game.state_t > 3.0 and int(t * 2) % 2:
@@ -4080,8 +5287,10 @@ def draw_reward(surf, font, game, t):
     shade = pygame.Surface((W, WORLD_H), pygame.SRCALPHA)
     shade.fill((4, 2, 8, 170))
     surf.blit(shade, (0, 0))
-    text(surf, font, "Kül bir armağan bırakıyor...", W // 2, 12, (220, 170, 130), center=True)
-    x0 = (W - (CARD_W * 3 + CARD_GAP * 2)) // 2
+    text(surf, font, "Bir emanet parlıyor..." if game.reward_relic else "Kül bir armağan bırakıyor...", W // 2, 12,
+         (255, 220, 140) if game.reward_relic else (220, 170, 130), center=True)
+    n = len(game.choices)
+    x0 = (W - (CARD_W * n + CARD_GAP * (n - 1))) // 2
     for i, key in enumerate(game.choices):
         sel = i == game.choice_i
         draw_boon_card(surf, font, game, key, x0 + i * (CARD_W + CARD_GAP), 32 - (3 if sel else 0), sel, t)
@@ -4110,7 +5319,9 @@ def draw_boon_card(surf, font, game, key, x, y, sel, t):
     surf.blit(ic, (x + cw // 2 - 9, y + 13))
     text(surf, font, b["name"], x + cw // 2, y + 42, (240, 200, 150) if sel else (170, 150, 140), center=True)
     lvl = game.player.boons.get(key, 0)
-    if key in BOONS and key != "sifa":
+    if b.get("relic"):
+        text(surf, font, "EMANET", x + cw // 2, y + 54, (255, 210, 120), center=True)
+    elif key in BOONS and key != "sifa":
         text(surf, font, f"Sv {lvl} > {lvl + 1}", x + cw // 2, y + 54, (130, 110, 150), center=True)
     for j, line in enumerate(b["desc"]):
         text(surf, font, line, x + cw // 2, y + 70 + j * 11, (200, 190, 210) if sel else (120, 112, 130),
@@ -4182,7 +5393,7 @@ def draw_market(surf, font, game, t):
 
 # --- Ayarlar ve duraklatma menüsü ---------------------------------------------------
 SETTINGS_PATH = os.environ.get("KUL_SETTINGS") or os.path.expanduser("~/.config/kul-mahzeni/ayarlar.json")
-DEFAULT_SETTINGS = {"music": 7, "sfx": 8, "shake": True, "fullscreen": False, "scare": True}
+DEFAULT_SETTINGS = {"music": 7, "sfx": 8, "shake": True, "fullscreen": False, "scare": True, "auto": True}
 
 
 def load_settings():
@@ -4212,7 +5423,7 @@ def save_settings(st):
 # --- Kalıcı ilerleme: kül, Kül Sunağı güçleri ve kayıt ------------------------------
 SAVE_PATH = os.environ.get("KUL_SAVE") or os.path.expanduser("~/.config/kul-mahzeni/kayit.json")
 DEFAULT_SAVE = {"kul": 0, "total_kul": 0, "perks": {}, "runs": 0, "wins": 0, "best_floor": 0,
-                "checkpoint": None}
+                "checkpoint": None, "hero": {}}
 
 PERKS = [
     {"key": "can", "name": "Taş Yürek", "desc": "Her oyuna +1 canla başla", "costs": [25, 55, 100],
@@ -4386,7 +5597,7 @@ CONTROLS = [
 class PauseMenu:
     MAIN = ["Devam Et", "Ayarlar", "Kontroller", "Yeniden Başla", "Oyundan Çık"]
     SETTINGS = [("Müzik", "music"), ("Efektler", "sfx"), ("Ekran sarsıntısı", "shake"),
-                ("Tam ekran", "fullscreen"), ("Korku anları", "scare"), ("Geri", None)]
+                ("Tam ekran", "fullscreen"), ("Korku anları", "scare"), ("Otomatik saldırı", "auto"), ("Geri", None)]
 
     def __init__(self, settings, sfx):
         self.settings = settings
@@ -4396,6 +5607,7 @@ class PauseMenu:
         self.i = 0
         self.confirm = None
         self.t = 0.0
+        self.from_title = False
 
     def show(self):
         self.open, self.page, self.i, self.confirm, self.t = True, "main", 0, None, 0.0
@@ -4455,6 +5667,9 @@ class PauseMenu:
             self.page, self.i = "main", 1
             save_settings(self.settings)
             self.sfx.play("select")
+            if self.from_title:  # başlangıç menüsünden gelindiyse doğrudan dön
+                self.from_title = False
+                self.close()
             return None
         st = self.settings
         if key_name in ("music", "sfx") and (left or right or ok):
@@ -4462,7 +5677,7 @@ class PauseMenu:
             st[key_name] = max(0, min(10, st[key_name] + step)) if not ok else (st[key_name] + 1) % 11
             self.sfx.set_levels(st["music"], st["sfx"], duck=True)
             self.sfx.play("hit" if key_name == "sfx" else "select")
-        elif key_name in ("shake", "fullscreen", "scare") and (left or right or ok):
+        elif key_name in ("shake", "fullscreen", "scare", "auto") and (left or right or ok):
             st[key_name] = not st[key_name]
             self.sfx.play("select")
             if key_name == "fullscreen":
@@ -4540,7 +5755,7 @@ def draw_menu(surf, font, big, menu, game, t):
             text(surf, font, "Öykü hâlâ zindanda...", W // 2, y + 123, (200, 110, 140), center=True, shadow=False)
         text(surf, font, "W/S seç  ·  J onayla  ·  ESC devam", W // 2, H - 12, (110, 100, 130), center=True)
     elif menu.page == "settings":
-        x, y, w, h = 50, 14, 220, 144
+        x, y, w, h = 50, 6, 220, 160
         draw_panel(surf, x, y, w, h, t)
         text(surf, big, "AYARLAR", W // 2, y + 8, (240, 150, 90), center=True)
         pygame.draw.line(surf, (90, 50, 50), (x + 16, y + 26), (x + w - 16, y + 26))
@@ -4682,6 +5897,17 @@ def draw_number(surf, value, x, y, col, lim=WORLD_H):
 
 
 def draw_effect(surf, e, t):
+    if e["kind"] == "spark":  # vuruş kıvılcımı: darbe yönünde açılan ışın
+        k = 1 - e["t"] / e["total"]
+        ln = (14 if e["big"] else 9) * (0.4 + k)
+        x, y, base = e["x"], e["y"], e["a"]
+        for off in (0.0, 0.9, -0.9, 2.4, -2.4):
+            a = base + off
+            r0, r1 = ln * k * 0.5, ln * (1.0 if off == 0.0 else 0.65)
+            pygame.draw.line(surf, (255, 255, 240) if k < 0.5 else (255, 190, 100),
+                             (int(x + math.cos(a) * r0), int(y + math.sin(a) * r0)),
+                             (int(x + math.cos(a) * r1), int(y + math.sin(a) * r1)))
+        return
     if e["kind"] == "zap":  # şimşek ruhu sıçraması
         x, y = e["x"], e["y"]
         for i in range(1, 7):
@@ -4827,12 +6053,17 @@ class TitleScreen:
         self.save = save
         self.shop = PerkShop(save)
         self.sel = 0
-        self.stage = "weapon"       # weapon -> spirit
+        self.stage = "menu"         # menu -> (char) -> weapon -> spirit
+        self.menu_i = 0
+        self.char_i = 0
         self.spirit_i = 0
         self.t = 0.0
+        self.motes = []
+        self.bg_art = None
         self.room = Room(5, COLS // 2, random.Random(11), "combat", 1, 1)
         CUR = self.room
-        self.frames = build_frames(HERO_BODY, HERO_LEGS, HERO_PAL)
+        save["hero"] = dict(DEFAULT_LOOK, **save.get("hero", {}))
+        self.frames = hero_frames(save["hero"])
         self.wimgs = {k: sprite_from_rows(v, WPAL) for k, v in WEAPON_SPRITES.items()}
 
     def ensure_bg(self, font):
@@ -4858,6 +6089,8 @@ class TitleScreen:
                 self.stage = "weapon"
                 sfx.play("select")
             return None
+        if self.stage == "char":
+            return self.handle_char(key, sfx)
         if key == pygame.K_k:
             self.shop.open, self.shop.msg = True, ""
             sfx.play("select")
@@ -4865,6 +6098,8 @@ class TitleScreen:
         if key == pygame.K_c and self.save.get("checkpoint"):
             sfx.play("pick")
             return "continue"
+        if self.stage == "menu":
+            return self.handle_menu(key, sfx)
         if key in (pygame.K_a, pygame.K_LEFT):
             self.sel = (self.sel - 1) % len(WEAPON_ORDER)
             sfx.play("select")
@@ -4875,8 +6110,197 @@ class TitleScreen:
             self.stage = "spirit"
             sfx.play("pick")
         elif key == pygame.K_ESCAPE:
-            return "quit"
+            self.stage = "menu"
+            sfx.play("select")
         return None
+
+    def menu_items(self):
+        items = ["Başlat"]
+        if self.save.get("checkpoint"):
+            items.append("Devam Et")
+        return items + ["Karakter", "Kül Sunağı", "Ayarlar", "Çıkış"]
+
+    def handle_menu(self, key, sfx):
+        items = self.menu_items()
+        if key in (pygame.K_w, pygame.K_UP, pygame.K_s, pygame.K_DOWN):
+            self.menu_i = (self.menu_i + (1 if key in (pygame.K_s, pygame.K_DOWN) else -1)) % len(items)
+            sfx.play("select")
+        elif key in (pygame.K_j, pygame.K_x, pygame.K_RETURN, pygame.K_SPACE):
+            item = items[self.menu_i]
+            sfx.play("pick")
+            if item == "Başlat":  # ilk oyunda önce karakter
+                self.stage = "weapon" if self.save["hero"]["name"] else "char"
+                self.char_i = 0
+            elif item == "Devam Et":
+                return "continue"
+            elif item == "Karakter":
+                self.stage, self.char_i = "char", 0
+            elif item == "Kül Sunağı":
+                self.shop.open, self.shop.msg = True, ""
+            elif item == "Ayarlar":
+                return "settings"
+            else:
+                return "quit"
+        return None
+
+    CHAR_ROWS = [("Ad", "name"), ("Kukuleta", "hood"), ("Atkı", "scarf"), ("Gözler", "eyes"), ("Başlık", "hat"), ("Tamam", None)]
+
+    def char_options(self, key):
+        return {"hood": LOOK_HOODS, "scarf": LOOK_SCARVES, "eyes": LOOK_EYES, "hat": LOOK_HATS}[key]
+
+    def type_text(self, s, font=None):
+        """Ad alanına yazı: Türkçe karakterler dahil, yazı tipinde olanlar."""
+        if self.stage != "char" or self.char_i != 0:
+            return
+        h = self.save["hero"]
+        for ch in s:
+            if (ch == " " or ch in GLYPHS or ch in _MARKS) and len(h["name"]) < 12:
+                h["name"] += ch
+
+    def handle_char(self, key, sfx):
+        h = self.save["hero"]
+        typing = self.char_i == 0
+        up = key == pygame.K_UP or (key == pygame.K_w and not typing)
+        down = key == pygame.K_DOWN or (key == pygame.K_s and not typing)
+        left = key == pygame.K_LEFT or (key == pygame.K_a and not typing)
+        right = key == pygame.K_RIGHT or (key == pygame.K_d and not typing)
+        ok = key == pygame.K_RETURN or (key in (pygame.K_j, pygame.K_x, pygame.K_SPACE) and not typing)
+        if key == pygame.K_ESCAPE:
+            self.stage = "menu"
+            write_save(self.save)
+            sfx.play("select")
+        elif up or down:
+            self.char_i = (self.char_i + (1 if down else -1)) % len(self.CHAR_ROWS)
+            sfx.play("select")
+        elif typing:
+            if key == pygame.K_BACKSPACE:
+                h["name"] = h["name"][:-1]
+                sfx.play("select")
+            elif ok:
+                self.char_i = 1
+                sfx.play("select")
+        elif (left or right or ok) and self.CHAR_ROWS[self.char_i][1]:
+            k = self.CHAR_ROWS[self.char_i][1]
+            h[k] = (h[k] + (-1 if left else 1)) % len(self.char_options(k))
+            self.frames = hero_frames(h)
+            sfx.play("select")
+        elif ok:
+            h["name"] = h["name"].strip() or "Gezgin"
+            write_save(self.save)
+            self.stage = "weapon"
+            sfx.play("pick")
+        return None
+
+    def menu_art(self):
+        """Başlangıç ekranının resmi: kızıl ufukta yıkık kale, ay ve siluetler."""
+        if self.bg_art:
+            return self.bg_art
+        rng = random.Random(4)
+        s_ = pygame.Surface((W, H))
+        for y in range(H):
+            k = y / H
+            band = int(k * 18) / 18
+            c = (int(14 + 120 * band ** 2), int(8 + 26 * band ** 3), int(30 + 22 * band - 18 * band ** 2))
+            for x in range(W):
+                d = (k * 18 - int(k * 18)) * 16
+                s_.set_at((x, y), tuple(min(255, v + 8) for v in c) if d > BAYER[y % 4][x % 4] else c)
+        pygame.draw.circle(s_, (214, 196, 170), (250, 42), 22)
+        pygame.draw.circle(s_, (190, 168, 150), (243, 37), 5)
+        pygame.draw.circle(s_, (190, 168, 150), (258, 50), 3)
+        for _ in range(70):
+            s_.set_at((rng.randrange(W), rng.randrange(80)), (200, 190, 210))
+        for base, col, step in ((118, (30, 16, 30), 9), (134, (18, 10, 20), 13)):  # uzak ve yakın dağlar
+            pts, h = [(0, H)], base
+            for x in range(0, W + step, step):
+                h = max(base - 22, min(base + 12, h + rng.randint(-8, 8)))
+                pts.append((x, h))
+            pts.append((W, H))
+            pygame.draw.polygon(s_, col, pts)
+        dark = (8, 5, 10)
+        for x, w_, top in ((176, 18, 84), (198, 30, 70), (232, 16, 92), (150, 14, 104), (252, 22, 106)):  # kale
+            pygame.draw.rect(s_, dark, (x, top, w_, H - top))
+            for bx in range(x, x + w_, 6):
+                pygame.draw.rect(s_, dark, (bx, top - 4, 4, 4))
+            pygame.draw.rect(s_, (240, 140, 60), (x + w_ // 2 - 1, top + 12, 2, 4))
+        self.bg_art = s_
+        return s_
+
+    def draw_motes(self, canvas):
+        rng = random
+        if rng.random() < 0.5:
+            self.motes.append([rng.uniform(0, W), H + 2, rng.uniform(-8, 8), rng.uniform(-30, -12), rng.uniform(3, 7)])
+        for m in self.motes:
+            m[0] += m[2] / 60 + math.sin(m[1] * 0.04) * 0.2
+            m[1] += m[3] / 60
+            m[4] -= 1 / 60
+            if 0 <= m[0] < W and 0 <= m[1] < H:
+                canvas.set_at((int(m[0]), int(m[1])), (255, 170, 80) if m[4] > 2 else (150, 60, 30))
+        self.motes = [m for m in self.motes if m[4] > 0]
+
+    def draw_hero_big(self, canvas, cx, ground, scale, t):
+        img = pygame.transform.scale(self.frames[int(t * 2) % 2], (12 * scale, 16 * scale))
+        pygame.draw.ellipse(canvas, (6, 3, 8), (cx - 7 * scale, ground - scale, 14 * scale, 2 * scale))
+        canvas.blit(img, (cx - 6 * scale, ground - 16 * scale + int(math.sin(t * 2) * 1.5)))
+
+    def draw_main(self, canvas, font, big, t):
+        canvas.blit(self.menu_art(), (0, 0))
+        self.draw_motes(canvas)
+        self.draw_hero_big(canvas, 232, 168, 5, t)
+        logo = PixelFont(3)
+        draw_logo(canvas, logo, "KÜL", 62, 12)
+        draw_logo(canvas, logo, "MAHZENİ", 74, 40)
+        h = self.save["hero"]
+        if h["name"]:
+            text(canvas, font, h["name"], 232, 74, (255, 215, 170), center=True)
+        for i, item in enumerate(self.menu_items()):
+            y = 76 + i * 15
+            sel = i == self.menu_i
+            if sel:
+                pygame.draw.rect(canvas, (70, 24, 26), (14, y - 2, 104, 14))
+                pygame.draw.rect(canvas, (235, 130, 70), (14, y - 2, 104, 14), 1)
+                draw_flame(canvas, 22, y + 9, t)
+            text(canvas, font, item, 32, y, (255, 225, 170) if sel else (170, 150, 165))
+        sv = self.save
+        text(canvas, font, f"{sv['runs']} yolculuk · {sv['wins']} zafer", 6, H - 12, (120, 100, 120), shadow=False)
+
+    def draw_char(self, canvas, font, big, t):
+        canvas.blit(self.menu_art(), (0, 0))
+        shade = pygame.Surface((W, H), pygame.SRCALPHA)
+        shade.fill((6, 3, 10, 170))
+        canvas.blit(shade, (0, 0))
+        text(canvas, big, "KARAKTERİNİ OLUŞTUR", W // 2, 12, (240, 150, 90), center=True)
+        pygame.draw.ellipse(canvas, (50, 28, 34), (24, 142, 96, 18))
+        pygame.draw.ellipse(canvas, (120, 66, 50), (24, 142, 96, 18), 1)
+        self.draw_hero_big(canvas, 72, 152, 6, t)
+        h = self.save["hero"]
+        for i, (label, k) in enumerate(self.CHAR_ROWS):
+            y = 38 + i * 19
+            sel = i == self.char_i
+            if sel:
+                pygame.draw.rect(canvas, (56, 24, 30), (132, y - 3, 176, 16))
+                pygame.draw.rect(canvas, (235, 130, 70), (132, y - 3, 176, 16), 1)
+            col = (255, 225, 170) if sel else (170, 150, 165)
+            if k is None:
+                text(canvas, font, label, 220, y, col, center=True)
+            elif k == "name":
+                text(canvas, font, label, 140, y, col)
+                cursor = "_" if sel and int(t * 3) % 2 else ""
+                text(canvas, font, (h["name"] + cursor) or "yazmaya başla", 196, y,
+                     (255, 240, 200) if h["name"] else (110, 100, 120))
+            else:
+                text(canvas, font, label, 140, y, col)
+                opts = self.char_options(k)
+                o = opts[h[k] % len(opts)]
+                name = o if isinstance(o, str) else o[0]
+                if k != "hat":
+                    pygame.draw.rect(canvas, o[1], (196, y + 1, 8, 8))
+                    pygame.draw.rect(canvas, (20, 14, 20), (196, y + 1, 8, 8), 1)
+                text(canvas, font, name, 208, y, (235, 225, 235))
+                if sel:
+                    text(canvas, font, "<", 186, y, (255, 200, 120), shadow=False)
+                    text(canvas, font, ">", 296, y, (255, 200, 120), shadow=False)
+        hint = "yaz  ·  Enter sonraki  ·  oklar gezin" if self.char_i == 0 else "W/S gezin  ·  A/D değiştir  ·  ESC geri"
+        text(canvas, font, hint, 220, H - 14, (130, 118, 150), center=True)
 
     def draw_spirits(self, canvas, font, big, t):
         shade = pygame.Surface((W, H), pygame.SRCALPHA)
@@ -4941,6 +6365,12 @@ class TitleScreen:
         canvas.blit(world, (0, 0))
         if self.shop.open:
             self.shop.draw(canvas, font, big, t)
+            return
+        if self.stage == "menu":
+            self.draw_main(canvas, font, big, t)
+            return
+        if self.stage == "char":
+            self.draw_char(canvas, font, big, t)
             return
 
         draw_logo(canvas, big, "KÜL MAHZENİ", W // 2, 4)
@@ -5014,8 +6444,16 @@ class Game:
         self.sfx = sfx
         self.spirit = resume.get("spirit") if resume else spirit
         self.combo, self.combo_t, self.slowmo = 0, 0.0, 0.0
+        self.webs = []              # [x, y, kalan süre]
+        self.auto_on = True
+        self.auto_target = None
+        self.kick = [0.0, 0.0]      # yönlü ekran itmesi
+        self.best_combo = 0
+        self.reward_relic = False
+        self.exit_col, self.exit_kind = None, None
         self.scare_on = True
-        self.scare_wait = 2          # art arda iki korku anı olmasın
+        self.scare_wait = 1          # art arda iki korku anı olmasın
+        self.scare_style = (0, 0)
         self.scare_t = 0.0
         self.save = save if save is not None else load_save()
         self.shards = []            # yerdeki kor kırıntıları [x, y, vx, vy, yaş, değer]
@@ -5023,7 +6461,9 @@ class Game:
         self.kul_frac = 0.0
         self.font = font
         self.weapon = weapon
-        self.player = Player(0, 0, weapon)
+        self.hero = dict(DEFAULT_LOOK, **(self.save.get("hero") or {}))
+        self.hero_name = self.hero["name"] or "Gezgin"
+        self.player = Player(0, 0, weapon, self.hero)
         self.pshots, self.sched, self.effects, self.numbers = [], [], [], []
         self.flash = 0.0
         self.skill_uses = {}
@@ -5136,7 +6576,7 @@ class Game:
             self.shards.append([x, y, math.cos(a) * sp, math.sin(a) * sp - 20, 0.0, worth])
 
     def add_kul(self, value):
-        self.kul_frac += value * self.kul_mul
+        self.kul_frac += value * self.kul_mul * (1.5 if "hirs_kesesi" in self.player.boons else 1)
         whole = int(self.kul_frac)
         self.kul_frac -= whole
         self.kul_run += whole
@@ -5176,33 +6616,56 @@ class Game:
         if r.kind == "boss":
             if r.item:  # yerde bırakılan eşyayı otomatik al
                 self.pick_item()
-            self.enter_room(r.door_col, "haven", r.depth, r.floor, r.idx + 1)
+            self.enter_room(self.exit_col, "haven", r.depth, r.floor, r.idx + 1)
         elif r.kind == "haven":
             self.checkpoint()
-            self.enter_room(r.door_col, "combat", r.depth + 1, r.floor + 1, 1)
+            self.enter_room(self.exit_col, "combat", r.depth + 1, r.floor + 1, 1)
         else:
             idx = r.idx + 1
-            self.enter_room(r.door_col, self.room_kind(r.floor, idx), r.depth + 1, r.floor, idx)
+            kind = self.exit_kind or self.room_kind(r.floor, idx)
+            self.enter_room(self.exit_col, kind, r.depth + 1, r.floor, idx)
+
+    def plan_floor(self, floor):
+        """Her katın uzunluğu, oda sırası ve bölgesi her oyunda yeniden belirlenir."""
+        length = random.randint(FLOOR_MIN, FLOOR_MAX)
+        slots = list(range(2, length))
+        rest = random.choice((length // 2, length // 2 + 1))
+        slots.remove(rest)
+        random.shuffle(slots)
+        plan = {rest: "rest", length: "boss"}
+        shop = "tansi" if floor >= 3 else random.choice(("hazine", "dukkan"))
+        plan[slots.pop()] = shop
+        if floor <= len(MEMORIES) and not self.endless:
+            plan[slots.pop()] = "ani"
+        events = random.sample(("lanet", "kusatma", "hazine", "dukkan"), 2)
+        plan[slots.pop()] = events[0]
+        if len(slots) > 2:   # uzun katta ikinci bir olay
+            plan[slots.pop()] = events[1]
+        used = self.plans[floor - 1]["biome"] if floor - 1 in self.plans else None
+        biome = random.choice([b for b in BIOMES if b != used])
+        self.plans[floor] = {"rooms": plan, "len": length, "biome": os.environ.get("KUL_BIOME") or biome}
+        self.log.append(f"kat{floor}:{self.plans[floor]['biome']}/{length}")
+
+    def floor_plan(self, floor):
+        if floor not in self.plans:
+            self.plan_floor(floor)
+        return self.plans[floor]
+
+    def floor_len(self, floor):
+        return self.floor_plan(floor)["len"]
 
     def room_kind(self, floor, idx):
-        if idx == FLOOR_LEN:
-            return "boss"
-        if idx in REST_IDX:
-            return "rest"
-        if floor not in self.plans:  # her katta bir hazine/tüccar, hikâye katlarında bir de anı
-            first = random.choice(("hazine", "dukkan"))
-            other = "dukkan" if first == "hazine" else "hazine"
-            late = "ani" if floor <= len(MEMORIES) and not self.endless else random.choice((other, "combat"))
-            a, b = random.choice((2, 3)), random.choice((5, 6))
-            self.plans[floor] = {a: "tansi" if floor >= 3 else first, b: late}
-            # kalan iki odadan biri kesin, öteki bazen olay odası olur
-            events = random.sample(("lanet", "kusatma"), 2)
-            rest = [5 - a, 11 - b]
-            random.shuffle(rest)
-            self.plans[floor][rest[0]] = events[0]
-            if random.random() < 0.4:
-                self.plans[floor][rest[1]] = events[1]
-        return self.plans[floor].get(idx, "combat")
+        return self.floor_plan(floor)["rooms"].get(idx, "combat")
+
+    def next_options(self, floor, idx, kind):
+        """Sonraki oda: hikâye odaları sabit kalır, geri kalanında iki kapı arasında seçim yaparsın."""
+        if kind in ("boss", "haven"):
+            return []
+        planned = self.room_kind(floor, idx + 1)
+        if planned in ("boss", "rest", "ani", "tansi") or random.random() > 0.8:
+            return [planned]
+        alt = random.choice([k for k in ("combat", "hazine", "dukkan", "lanet", "kusatma") if k != planned])
+        return [planned, alt]
 
     def enter_room(self, entry_col, kind, depth, floor, idx):
         global CUR
@@ -5215,8 +6678,12 @@ class Game:
         tansi = kind == "tansi"
         if tansi:
             kind = "dukkan"
-        self.room = Room(depth, entry_col, random.Random(), kind, floor, idx)
+        options = self.next_options(floor, idx, kind)
+        self.room = Room(depth, entry_col, random.Random(), kind, floor, idx, fork=len(options) > 1)
+        self.room.exits = dict(zip(self.room.door_cols(), options))
+        self.exit_col, self.exit_kind = self.room.door_col, None
         self.room.tansi = tansi
+        self.room.apply_biome(self.floor_plan(floor)["biome"])
         self.scare_wait = max(0, self.scare_wait - 1)
         self.room.decor = self.delivered
         CUR = self.room
@@ -5232,6 +6699,7 @@ class Game:
         self.boss_spawned = False
         self.darkness = self.room.dark
         self.spike_t = 0.0
+        self.webs = []
         self.market = None
         self.siege_left, self.siege_spawn = SIEGE_TIME, 1.2
         self.oyku = Oyku(160, 76) if kind == "haven" else Oyku(160, 70, ghost=True) if kind == "ani" else None
@@ -5240,13 +6708,15 @@ class Game:
         if p.room_shield:
             p.shield, p.shield_t = max(p.shield, p.room_shield), 60.0
         if kind == "combat" and floor not in self.butterflies and \
+                os.environ.get("KUL_BUTTERFLY") != "0" and \
                 (os.environ.get("KUL_BUTTERFLY") or random.random() < BUTTERFLY_CHANCE):
             self.butterflies.add(floor)  # bir katta en fazla bir kez
             self.log.append("kelebek cikti")
             self.enemies.append(Butterfly(random.randint(60, 260), random.randint(40, 110)))
+            self.sfx.play("shimmer", 0.8)
         self.log.append(f"{floor}-{idx} {kind}")
         if kind == "combat":
-            sub = ROOM_VARIANTS.get(self.room.variant, "küllerden doğanlar")
+            sub = ROOM_VARIANTS.get(self.room.variant, BIOMES[self.room.biome]["name"])
             self.title = (f"ODA {idx}", f"{floor}. kat · {sub}", (220, 130, 90))
         elif kind == "rest":
             self.title = ("KOR SUNAĞI", "dinlen, yaralarını sar", (220, 130, 90))
@@ -5274,7 +6744,9 @@ class Game:
             self.title = (name, sub, (230, 70, 60))
         else:
             self.title = ("ÖYKÜ'NÜN SIĞINAĞI", "mahzende renk kalan tek yer", (255, 150, 190))
+        self.sfx.set_biome(self.room.biome)
         self.sfx.start_music({"boss": "boss", "haven": "haven", "ani": "haven"}.get(kind, "calm"))
+        self.sfx.start_ambience(None if kind in ("haven", "ani") else self.room.biome)
 
     def try_scare(self):
         """Hasar almadan bitirilen oda bazen bunu ödüllendirir. Ödülü korku takip eder."""
@@ -5283,11 +6755,13 @@ class Game:
             return False
         room.scare_checked = True
         force = os.environ.get("KUL_SCARE")
-        if room.kind not in ("combat", "boss", "kusatma") or (room.took_hit and force != "2"):
+        if room.kind not in ("combat", "boss", "kusatma", "hazine"):
             return False
-        if not force and (self.scare_wait > 0 or random.random() >= SCARE_CHANCE):
+        chance = SCARE_CHANCE_HIT if room.took_hit else SCARE_CHANCE
+        if not force and (self.scare_wait > 0 or random.random() >= chance):
             return False
-        self.scare_wait = 3
+        self.scare_wait = 1
+        self.scare_style = (random.randrange(3), random.randrange(len(SCARE_COLORS)))
         self.state, self.state_t = "scare", 0.0
         self.sfx.start_music(None)
         self.log.append("korku")
@@ -5311,7 +6785,9 @@ class Game:
         self.fps = FpsMode(self)
         self.state, self.state_t = "fps", 0.0
         self.sfx.play("roar", 0.5)
-        self.sfx.start_music("boss")
+        self.sfx.start_music("fps")
+        self.sfx.start_ambience(None)
+        self.sfx.set_heart(False)
 
     def end_fps(self):
         self.log.append(f"boyut {self.fps.kills}")
@@ -5320,6 +6796,7 @@ class Game:
         self.player.invuln = 1.5
         self.flash = 0.1
         self.sfx.start_music("calm")
+        self.sfx.start_ambience(self.room.biome)
 
     def memory(self):
         return MEMORIES[min(self.room.floor, len(MEMORIES)) - 1]
@@ -5479,33 +6956,45 @@ class Game:
         free = [(tx, ty) for ty in range(1, ROWS - 2) for tx in range(1, COLS - 1)
                 if not room.solid(tx, ty)]
         random.shuffle(free)
-        kinds = ["w"] * n_wisp
-        for _ in range(n_ghoul):  # derine indikçe hortlakların yerini başkaları alır
-            r = random.random()
-            if room.depth >= 2 and r < 0.25:
-                kinds += ["c", "c"]
-            elif room.depth >= 3 and r < 0.42:
-                kinds.append("b")
-            elif room.depth >= 5 and r < 0.58:
-                kinds.append("s")
-            else:
-                kinds.append("g")
+        pool = [(k, w) for k, w, need in BIOMES[room.biome]["pool"] if room.depth >= need]
+        kinds = []
+        for k in random.choices([p[0] for p in pool], [p[1] for p in pool], k=n_ghoul + n_wisp):
+            kinds += [k] * {"c": 2, "k": 2, "v": 3}.get(k, 1)  # sürüler kalabalık gelir
         force = os.environ.get("KUL_ENEMY")  # yalnızca test
         if force:
             kinds = [force] * len(kinds)
         hp_b, hp_s = 3 + room.depth // 4, 5 + room.depth // 4
         make = {"g": lambda x, y: Ghoul(x, y, hp_g), "w": lambda x, y: Wisp(x, y, hp_w),
                 "c": lambda x, y: Crawler(x, y), "b": lambda x, y: Bloat(x, y, hp_b),
-                "s": lambda x, y: Guard(x, y, hp_s)}
+                "s": lambda x, y: Guard(x, y, hp_s), "a": lambda x, y: Archer(x, y, hp_w + 1),
+                "h": lambda x, y: Shaman(x, y, hp_b), "t": lambda x, y: Stalker(x, y, hp_b),
+                "r": lambda x, y: Spider(x, y, hp_b), "k": lambda x, y: Hound(x, y, hp_w + 1),
+                "n": lambda x, y: Chainer(x, y, hp_s), "o": lambda x, y: Totem(x, y, hp_s),
+                "l": lambda x, y: Slime(x, y, hp_g), "e": lambda x, y: Wraith(x, y, hp_b),
+                "d": lambda x, y: Brute(x, y, hp_s * 3), "v": lambda x, y: Bat(x, y),
+                "m": lambda x, y: Spore(x, y, hp_b)}
+        elite_left = 1 + room.floor // 3
         for tx, ty in free:
             if not kinds:
                 break
             x, y = tx * TILE + 8, ty * TILE + 12
             if math.hypot(x - self.player.x, y - self.player.y) > 72:
                 k = kinds.pop()
-                self.enemies.append(make[k](x, y))
+                e = make[k](x, y)
+                chance = 1.0 if os.environ.get("KUL_ELITE") else 0.06 + 0.02 * room.floor
+                if room.depth >= 3 and elite_left > 0 and random.random() < chance:
+                    elite_left -= 1
+                    self.make_elite(e)
+                self.enemies.append(e)
                 self.fx.burst(x, y - 2, 8, [(70, 64, 76), (110, 100, 110)], speed=25, life=0.7)
         self.sfx.play("spawn")
+
+    def make_elite(self, e):
+        e.elite = random.choice(list(ELITES))
+        e.hp = e.hp * 2 + 1
+        if e.elite == "kalkanli":
+            e.ward = 2
+        self.log.append(f"secin {e.elite}")
 
     def spawn_boss(self):
         f = self.room.floor
@@ -5528,15 +7017,49 @@ class Game:
         pool = [k for k in common_boons() if p.boons.get(k, 0) < BOONS[k]["max"]]
         random.shuffle(pool)
         self.choices = pool[:3]
-        if not self.choices:  # her armağan en üst seviyede: yalnızca şifa kalır
+        relics = [k for k, b in BOONS.items() if b.get("relic") and k not in p.boons]
+        self.reward_relic = bool(relics) and (self.room.elite_down or self.room.kind == "hazine") and \
+            not self.room.relic_given
+        if self.reward_relic:  # seçkin düşman ve sandık emanet bırakır
+            self.room.relic_given = True
+            self.choices = random.sample(relics, min(3, len(relics)))
+        elif not self.choices:  # her armağan en üst seviyede: yalnızca şifa kalır
             self.choices = ["sifa"]
         elif p.hp < p.max_hp and random.random() < 0.6:
             self.choices[-1] = "sifa"
-        self.choice_i = 1
+        self.choice_i = min(1, len(self.choices) - 1)
         self.state, self.state_t = "reward", 0.0
 
+    def clear_shot(self, e):
+        p = self.player
+        d = math.hypot(e.x - p.x, e.y - p.y)
+        ux, uy = norm(e.x - p.x, e.y - p.y)
+        for i in range(1, int(d / 8)):
+            if CUR.shot_solid(int(p.x + ux * i * 8) // TILE, int(p.y + uy * i * 8) // TILE):
+                return False
+        return True
+
+    def find_target(self):
+        """En yakın düşman; önce doğrudan görülebilenler, kelebek en sonda."""
+        p = self.player
+        live = [e for e in self.enemies if e.active()]
+        if not live:
+            return None
+        hostile = [e for e in live if not e.passive] or live
+        ranged = p.weapon in ("yay", "asa")
+        pool = [e for e in hostile if not ranged or self.clear_shot(e)] or hostile
+        return min(pool, key=lambda e: math.hypot(e.x - p.x, e.y - p.y))
+
+    def in_range(self, e):
+        p = self.player
+        reach = AUTO_RANGE[p.weapon] * (1 if p.weapon in ("yay", "asa") else p.reach) + (14 if isinstance(e, Boss) else 0)
+        if math.hypot(e.x - p.x, e.y - p.y) > reach:
+            return False
+        return p.weapon not in ("yay", "asa") or self.clear_shot(e)
+
     def combo_bonus(self):
-        return 2 if self.combo >= 25 else 1 if self.combo >= 10 else 0
+        low, high = (5, 15) if "ofke_disi" in self.player.boons else (10, 25)
+        return 2 if self.combo >= high else 1 if self.combo >= low else 0
 
     def damage_enemy(self, e, dmg, aim, knock=190, stun=0.0, pure=False):
         """pure: yanma ve sıçrama gibi ikincil hasar; kombo ve ruh tetiklemez."""
@@ -5551,14 +7074,29 @@ class Game:
             self.hitstop = max(self.hitstop, 0.03)
             return
         p0 = self.player
+        crit = False
+        if e.ward > 0 and not pure:  # koruma darbeyi yutar
+            e.ward -= 1
+            self.fx.ring(e.x, e.y - 8, 14, (210, 170, 255), 70, 0.25)
+            self.sfx.play("door", 0.35)
+            return
         if not pure:
             dmg += self.combo_bonus()
+            if e.elite == "zirhli":
+                dmg = max(1, dmg - 1)
+            if "kan_ayi" in p0.boons and p0.hp <= 2:
+                dmg += 2
+            if "sans_zari" in p0.boons and random.random() < 0.15:
+                dmg *= 2
+                crit = True
             if p0.crit:
                 p0.crit = False
+                crit = True
                 dmg = dmg * 2 + 1
                 self.fx.ring(e.x, e.y - 8, 16, (190, 235, 255), 80, 0.25)
             self.combo += 1
             self.combo_t = 2.6
+            self.best_combo = max(self.best_combo, self.combo)
         e.hit(dmg, aim, knock)
         if isinstance(e, Butterfly):
             self.log.append("kelebek")
@@ -5569,19 +7107,35 @@ class Game:
         if stun and not isinstance(e, Boss):
             e.stun = max(e.stun, stun)
         bx0, by0 = e.body_rect().midtop
-        self.numbers.append([bx0 + random.randint(-3, 3), by0 - 2, 0.7, dmg])
-        self.hitstop = max(self.hitstop, 0.05)
-        self.shake = max(self.shake, 2)
+        heavy = crit or dmg >= max(4, p0.dmg * 2)
+        self.numbers.append([bx0 + random.randint(-3, 3), by0 - 2, 0.8 if heavy else 0.65, dmg, crit,
+                             random.uniform(-16, 16), -46 if heavy else -34])
         bx, by = e.body_rect().center
-        self.fx.burst(bx, by, 6, [(255, 230, 200), (240, 120, 60)], speed=90, life=0.25)
+        if not pure:  # darbe hissi: kısa donma, yönlü itme, kıvılcım, öne küçük adım
+            stop = 0.04 + min(0.05, dmg * 0.008) + (0.02 if p0.weapon == "balyoz" else 0.0) + (0.03 if heavy else 0.0)
+            self.hitstop = max(self.hitstop, stop)
+            force = 4.5 if heavy else 2.5
+            self.kick = [aim[0] * force, aim[1] * force]
+            self.shake = max(self.shake, 3 if heavy else 1.5)
+            self.effect("spark", bx - aim[0] * 3, by - aim[1] * 3, 0.13, a=math.atan2(aim[1], aim[0]), big=heavy)
+            p0.kb[0] += aim[0] * 26
+            p0.kb[1] += aim[1] * 26
+        self.fx.burst(bx, by, 12 if heavy else 7, [(255, 240, 210), (255, 170, 90), (240, 110, 50)],
+                      speed=120 if heavy else 90, life=0.28)
         if isinstance(e, Boss) and getattr(e, "enraged", False):
             e.enraged = False  # ikinci evre: öfke kükremesi
             self.sfx.play("roar")
             self.shake = 8
             self.fx.ring(bx, by, 40, (255, 120, 50), 130, 0.5)
             self.fx.ring(bx, by, 24, (255, 230, 150), 80, 0.4)
-            self.title = ("ÖFKELENDİ", "", (255, 90, 60))
-            self.title_t = 1.4
+            if e.phase == 3:
+                self.title = ("SON NEFES", "bekçi son gücünü topluyor", (255, 60, 50))
+                self.title_t = 2.0
+                self.flash = 0.1
+                self.log.append("son nefes")
+            else:
+                self.title = ("ÖFKELENDİ", "", (255, 90, 60))
+                self.title_t = 1.4
         if e.dead:
             self.gain_mastery(6 if isinstance(e, Boss) else 1)
         if e.dead and isinstance(e, Boss):
@@ -5599,14 +7153,37 @@ class Game:
             return
         if e.dead:
             self.kills += 1
-            self.hitstop = 0.08
-            self.shake = 3
+            self.hitstop = max(self.hitstop, 0.09)
+            self.shake = max(self.shake, 4)
+            self.kick = [aim[0] * 5, aim[1] * 5]
             self.sfx.play("kill")
+            self.sfx.play("thud", 0.7)
+            self.stain(e)
+            self.fx.ring(bx, by, 14, (255, 220, 170), 80, 0.22)
+            if e.elite:
+                self.room.elite_down = True
+            pb = self.player.boons
+            if "kor_tohumu" in pb and random.random() < 0.25:
+                def seed(x=e.x, y=e.y):
+                    self.area_damage(x, y, 26, 1 + self.player.dmg, knock=170)
+                    self.fx.burst(x, y - 4, 18, [(255, 220, 120), (235, 110, 50)], speed=80, life=0.4)
+                    self.sfx.play("boom", 0.3)
+                self.schedule(0.12, seed)
+            if "kul_cani" in pb and self.kills % 20 == 0 and self.player.hp < self.player.max_hp:
+                self.player.hp += 1
+                self.sfx.play("heal", 0.5)
+            others = [m for m in self.enemies if m is not e and not m.dead and not m.passive]
+            if not others and self.room.waves_left <= 0 and self.room.kind == "combat":
+                self.slowmo = max(self.slowmo, 0.4)  # odanın son düşmanı: ağır çekim
+                self.flash = 0.06
             ashc = [(80, 74, 86), (110, 102, 114), (60, 54, 66)]
             if isinstance(e, Wisp):
                 ashc = [(255, 200, 90), (235, 110, 50), (150, 40, 30)]
             if not isinstance(e, ShadeClone):
-                self.drop_kul(bx, by, e.KUL)
+                self.drop_kul(bx, by, e.KUL * (3 if e.elite else 1))
+            e.on_death(self)
+            if e.elite == "patlayan":
+                self.hazards.append(Hazard(e.x, e.y, Bloat.BLAST_R, 0.5, "burst"))
             if isinstance(e, Bloat) and e.state != "swell":  # ölürken de patlar, kısa fitille
                 self.hazards.append(Hazard(e.x, e.y, Bloat.BLAST_R, 0.4, "burst"))
             self.fx.burst(bx, by, 26, ashc, speed=70, life=0.9, grav=-30)
@@ -5617,7 +7194,19 @@ class Game:
                 self.sfx.play("heal", 0.6)
                 self.fx.burst(p.x, p.y - 8, 10, [(220, 50, 60), (255, 120, 120)], speed=30, life=0.7, grav=-50)
         else:
-            self.sfx.play("hit", 0.7 if isinstance(e, Boss) else 1.0)
+            self.sfx.play(random.choice(("hit", "hit2", "hit3")), 0.7 if isinstance(e, Boss) else 1.0)
+            if heavy:
+                self.sfx.play("thud", 0.6)
+
+    def stain(self, e):
+        """Ölen düşman yerde iz bırakır; oda bitene kadar kalır."""
+        bg = self.room.bg
+        if bg is None:
+            return
+        col = (60, 24, 14) if isinstance(e, Wisp) else (34, 14, 20)
+        for _ in range(random.randint(4, 7)):
+            pygame.draw.circle(bg, col, (int(e.x + random.uniform(-9, 9)), int(e.y + random.uniform(-4, 4))),
+                               random.randint(1, 3))
 
     def player_hit(self, sx, sy):
         p = self.player
@@ -5655,17 +7244,29 @@ class Game:
             write_save(self.save)
             self.sfx.play("dead")
             self.sfx.start_music(None)
+            self.sfx.set_heart(False)
+            self.sfx.start_ambience(None)
             self.fx.burst(p.x, p.y - 6, 40, [(76, 68, 98), (44, 38, 60), (240, 80, 60)],
                           speed=80, life=1.2, grav=-25)
             self.state, self.state_t = "dead", 0.0
 
     def explode(self, h):
         p = self.player
+        if h.kind == "web":  # hasar vermez, zemine yapışır
+            self.webs.append([h.x, h.y, 7.0])
+            return
         if ((p.x - h.x) / h.r) ** 2 + ((p.y - h.y) / (h.r * 0.6)) ** 2 <= 1.15:
             self.player_hit(h.x, h.y)
         if h.kind == "burst":  # kül şişkini: yakındaki düşmanları da yakar
             self.area_damage(h.x, h.y, h.r, 2, knock=170)
             self.fx.ring(h.x, h.y - 2, h.r, (240, 140, 80), 100, 0.3)
+        if h.kind == "spore":  # zehir bulutu
+            self.fx.burst(h.x, h.y - 4, 16, [(170, 240, 100), (90, 170, 70), (60, 110, 60)], speed=38, life=0.8, grav=-20)
+            self.sfx.play("fizzle", 0.4)
+            return
+        if h.kind == "quake":  # çatlaktan fışkıran taş
+            self.fx.burst(h.x, h.y - 3, 5, [(120, 110, 120), (255, 150, 70)], speed=60, life=0.35, grav=120)
+            return
         if h.kind == "pillar":  # yerden fışkıran ateş sütunu
             self.shake = max(self.shake, 2)
             self.sfx.play("boom", 0.25)
@@ -6115,6 +7716,7 @@ class Game:
             lines, after = DIALOG_DELIVER[self.carrying], "deliver"
         else:
             lines, after = [random.choice(DIALOG_IDLE)], "heal"
+        lines = [ln.replace("{ad}", self.hero_name) for ln in lines]
         self.dialog = {"lines": lines, "i": 0, "chars": 0.0, "after": after, "blip": 0}
 
     def finish_talk(self):
@@ -6201,8 +7803,12 @@ class Game:
         self.update_shards(dt)
         self.flash = max(0.0, self.flash - dt)
         self.fx.update(dt)
-        for n in self.numbers:
-            n[1] -= dt * 18
+        decay = math.exp(-16 * dt)
+        self.kick = [self.kick[0] * decay, self.kick[1] * decay]
+        for n in self.numbers:  # sayılar yay çizerek düşer
+            n[0] += n[5] * dt
+            n[1] += n[6] * dt
+            n[6] += 95 * dt
             n[2] -= dt
         self.numbers = [n for n in self.numbers if n[2] > 0]
         for e in self.effects:
@@ -6311,8 +7917,27 @@ class Game:
                 self.say(*voice)
                 return
 
+        for w in self.webs:
+            w[2] -= dt
+        self.webs = [w for w in self.webs if w[2] > 0]
+        p.webbed = any(((p.x - w[0]) / 20) ** 2 + ((p.y - w[1]) / 12) ** 2 <= 1 for w in self.webs)
         calm = room.kind in ("haven", "ani")
-        p.update(dt, keys, dash_pressed, attack_pressed and not calm, self.sfx)
+        strike = attack_pressed
+        self.auto_target = None
+        p.auto_aim = None
+        if self.auto_on and not calm:
+            tgt = self.find_target()
+            if tgt:
+                self.auto_target = tgt
+                p.auto_aim = norm(tgt.x - p.x, tgt.y - p.y)
+                strike = strike or self.in_range(tgt)
+        step_was = int(p.anim)
+        p.update(dt, keys, dash_pressed, strike and not calm, self.sfx)
+        if p.moving and p.dash_t == 0 and int(p.anim) != step_was and int(p.anim) % 2 == 0:
+            self.sfx.play(random.choice(("step", "step2")), 0.35)
+        self.sfx.set_heart(p.hp <= 2 and p.hp > 0 and not GOD_MODE)
+        if p.auto_aim:
+            p.aim = p.auto_aim  # yetenekler de hedefe döner
         if skill is not None and not calm:
             self.use_skill(skill)
         self.process_player_events()
@@ -6346,7 +7971,12 @@ class Game:
                 e.physics(0, 0, dt)
                 continue
             e.slow = max(0.0, e.slow - dt)
-            e.update(dt * 0.55 if e.slow > 0 else dt, p, self)
+            ed = dt * (1.35 if e.elite == "hizli" else 1.0)
+            e.update(ed * 0.55 if e.slow > 0 else ed, p, self)
+            if isinstance(e, Boss) and e.phase == 3 and e.active() and random.random() < dt * 12:
+                bx, by = e.core()  # son nefes: bekçi parçalanıyor gibi kıvılcım saçar
+                self.fx.burst(bx + random.uniform(-10, 10), by + random.uniform(-14, 14), 2,
+                              [(255, 80, 60), (255, 230, 200)], speed=50, life=0.5, grav=-30)
         # oyuncu mermileri
         for sh in self.pshots:
             sh.update(dt)
@@ -6485,8 +8115,11 @@ class Game:
         # kapı
         if room.door_open:
             room.door_anim = min(1.0, room.door_anim + dt * 2)
-            if p.y < 14 and int(p.x) // TILE == room.door_col:
+            col = int(p.x) // TILE
+            if p.y < 14 and col in room.door_cols():
+                self.exit_col, self.exit_kind = col, room.exits.get(col)
                 self.state, self.state_t = "out", 0.0
+                self.sfx.play("whoosh", 0.7)
 
     def iris_radius(self):
         maxr = 360
@@ -6498,20 +8131,25 @@ class Game:
 
 
 # --- Korku anı ---------------------------------------------------------------------
-SCARE_CHANCE = 0.35
+SCARE_CHANCE = 0.7        # şimdilik yüksek: hasarsız oda
+SCARE_CHANCE_HIT = 0.25   # hasar alınmış odada da ara sıra
 SCARE_TIME = 1.7
 SCARE_FACES = []
+# Saniyede en fazla 3 parlama: ışığa duyarlı kişiler için bilinen güvenli sınır. Doygun kırmızı bilerek yok.
+SCARE_FLASH_HZ = 3
+SCARE_COLORS = [(70, 255, 130), (190, 80, 255), (255, 225, 60), (60, 225, 255), (255, 120, 220)]
 
 
 def build_scare_faces():
     """İki kareli, elle üretilmiş yüz: boş göz çukurları ve yırtık ağız."""
-    for mouth in (30, 44):
-        rng = random.Random(13)
+    for seed, mouth in ((13, 30), (13, 44), (29, 34), (29, 50), (47, 26), (47, 46)):
+        rng = random.Random(seed)
         w, h = W // 2, H // 2
         f = pygame.Surface((w, h))
         f.fill((255, 255, 255))
         cx, cy = w // 2, h // 2 + 2
-        pygame.draw.ellipse(f, (214, 208, 200), (cx - 44, cy - 50, 88, 104))
+        wide = 44 if seed == 13 else 36 if seed == 29 else 52   # üç ayrı yüz
+        pygame.draw.ellipse(f, (214, 208, 200), (cx - wide, cy - 50, wide * 2, 104))
         for _ in range(900):  # kirli deri
             a, r = rng.uniform(0, math.tau), rng.uniform(0, 1) ** 0.5
             f.set_at((int(cx + math.cos(a) * 42 * r) % w, int(cy + math.sin(a) * 50 * r) % h),
@@ -6541,7 +8179,7 @@ def build_scare_faces():
 
 
 def draw_scare(canvas, game):
-    """Önce bembeyaz ekran, sonra yüz. Yanıp sönmez: tek beyaz, tek yüz, kararma."""
+    """Önce bembeyaz ekran, sonra renk değiştirerek parlayan yüz, en sonda kararma."""
     t = game.state_t
     if not SCARE_FACES:
         build_scare_faces()
@@ -6549,10 +8187,20 @@ def draw_scare(canvas, game):
         canvas.fill((255, 255, 255))
         return
     k = min(1.0, (t - 0.2) / 1.1)
-    img = SCARE_FACES[0 if t < 0.34 else 1]
+    face, color = game.scare_style
+    img = SCARE_FACES[face * 2 + (0 if t < 0.34 else 1)]
     zw, zh = int(W * (1.0 + 0.45 * k)), int(H * (1.0 + 0.45 * k))
     big_img = pygame.transform.scale(img, (zw, zh))
-    canvas.fill((255, 255, 255))
+    beat = int((t - 0.2) * SCARE_FLASH_HZ)
+    col = SCARE_COLORS[(color + beat) % len(SCARE_COLORS)]
+    lit = ((t - 0.2) * SCARE_FLASH_HZ) % 1.0 < 0.5
+    if lit:  # parlama anı: renkli yüz
+        big_img = big_img.copy()
+        big_img.fill(col + (255,), special_flags=pygame.BLEND_RGBA_MULT)
+    else:
+        big_img = big_img.copy()
+        big_img.fill((70, 70, 70, 255), special_flags=pygame.BLEND_RGBA_MULT)
+    canvas.fill(col if lit else (12, 8, 12))
     canvas.blit(big_img, ((W - zw) // 2 + random.randint(-4, 4), (H - zh) // 2 + random.randint(-4, 4)))
     if t > 1.3:
         veil = pygame.Surface((W, H), pygame.SRCALPHA)
@@ -6841,6 +8489,17 @@ class FpsMode:
         if best:
             self.hit_mob(best)
 
+    def on_crosshair(self):
+        """Otomatik ateş: nişangâhın üstünde bir yaratık var mı?"""
+        wall = self.cast(self.ang)
+        for m in self.mobs:
+            dx, dy = m["x"] - self.px, m["y"] - self.py
+            d = math.hypot(dx, dy)
+            diff = abs((math.atan2(dy, dx) - self.ang + math.pi) % math.tau - math.pi)
+            if d < wall and diff < math.atan(0.4 / max(d, 0.3)) + 0.02:
+                return True
+        return False
+
     def fire(self):
         sfx = self.game.sfx
         gun = FPS_GUNS[self.gun]
@@ -6852,9 +8511,9 @@ class FpsMode:
             self.ammo[self.gun] -= 1
         if self.gun == 2:
             self.rockets.append({"x": self.px, "y": self.py, "a": self.ang})
-            sfx.play("charge", 0.5)
+            sfx.play("rocket", 0.9)
             return
-        sfx.play("slam" if self.gun == 1 else "shoot", 0.5)
+        sfx.play("shotgun" if self.gun == 1 else "ray", 0.85)
         for i in range(gun["pellets"]):
             off = (i - (gun["pellets"] - 1) / 2) * gun["spread"]
             self.shoot_ray(self.ang + off)
@@ -6918,7 +8577,7 @@ class FpsMode:
                     c = (40, 30, 70, 230) if self.map[yy][xx] == "." else (170, 130, 230, 255)
                     pygame.draw.rect(self.minimap, c, (xx * 2, yy * 2, 2, 2))
         self.fire_cd -= dt
-        if (keys[K.K_j] or keys[K.K_x]) and self.fire_cd <= 0:
+        if self.fire_cd <= 0 and (keys[K.K_j] or keys[K.K_x] or (self.game.auto_on and self.on_crosshair())):
             self.fire()
         self.double = max(0.0, self.double - dt)
         self.chain_t -= dt
@@ -6933,7 +8592,7 @@ class FpsMode:
                     self.px, self.py = dst[0] + 0.5, dst[1] + 0.5
                     self.tp_cd, self.hurt = 1.4, 0.0
                     self.game.flash = 0.1
-                    self.game.sfx.play("item", 0.6)
+                    self.game.sfx.play("portal", 0.9)
                     break  # aynı karede geri ışınlanmasın
         for pk in self.picks[:]:
             if math.hypot(self.px - pk["x"], self.py - pk["y"]) < 0.6:
@@ -7192,7 +8851,7 @@ class FpsMode:
         for dx_, dy_ in ((0, -5), (0, 2)):
             pygame.draw.line(out, (255, 255, 255), (W // 2, H // 2 + dy_), (W // 2, H // 2 + dy_ + 3))
         if FPS_TIME - self.left < 4:
-            text(out, font, "W/A/S/D yürü · ok tuşları dön · J ateş · 1 2 3 silah", W // 2, H - 58, (230, 230, 255),
+            text(out, font, "W/A/S/D yürü · ok tuşları dön · nişan al, kendi ateş eder · 1 2 3 silah", W // 2, H - 58, (230, 230, 255),
                  center=True)
 
     @staticmethod
@@ -7460,6 +9119,8 @@ def main():
         write_save(save)
         scene = "title"
         CUR = title.room
+        sfx.set_heart(False)
+        sfx.start_ambience(None)
         sfx.start_music("calm")
 
     def present():
@@ -7492,8 +9153,17 @@ def main():
                 save_settings(settings)
                 continue
             if scene == "title":
+                if ev.type == pygame.TEXTINPUT:
+                    title.type_text(ev.text)
+                if ev.type == pygame.KEYDOWN and menu.open:
+                    if menu.handle(ev.key) == "fullscreen":
+                        window = open_window()
+                    continue
                 if ev.type == pygame.KEYDOWN:
                     act = title.handle(ev.key, sfx)
+                    if act == "settings":
+                        menu.show()
+                        menu.page, menu.i, menu.from_title = "settings", 0, True
                     if act == "quit":
                         write_save(save)
                         return
@@ -7565,6 +9235,9 @@ def main():
             ash.update(dt)
             if scene == "title":
                 title.draw(canvas, world, lightmap, lights, ash, font, logo_font, vignette)
+                if menu.open:
+                    menu.t += dt
+                    draw_menu(canvas, font, big, menu, None, t)
                 if shot_dir and frame in shot_at:
                     pygame.image.save(pygame.transform.scale(canvas, (W * 3, H * 3)),
                                       os.path.join(shot_dir, f"f{frame}.png"))
@@ -7583,6 +9256,8 @@ def main():
         if max_frames and frame >= max_frames:
             p = game.player
             print("test:", " | ".join(game.log))
+            print("test: kalan", [(type(e).__name__, e.state, round(e.x), round(e.y)) for e in game.enemies][:8],
+                  "dalga", game.room.waves_left, "temiz", game.room.cleared, "kapi", game.room.door_open)
             print(f"test: silah={p.weapon} oda={game.room.depth} can={p.hp}/{p.max_hp} oldurme={game.kills} "
                   f"durum={game.state} istek={game.quest} elde={game.carrying} armagan={p.boons}")
             print(f"test: yetenekler={game.skill_uses}")
@@ -7597,6 +9272,7 @@ def main():
         if scene != "game":
             continue
         game.scare_on = settings["scare"]
+        game.auto_on = settings["auto"]
         if game.state == "scare":
             draw_scare(canvas, game)
             if shot_dir and frame in shot_at:
@@ -7614,6 +9290,7 @@ def main():
             present()
             continue
         ash.set_haven(game.room.kind in ("haven", "ani"))
+        ash.set_biome(game.room.biome)
         ash.update(dt)
         room, player = game.room, game.player
         haven = room.kind in ("haven", "ani")
@@ -7624,6 +9301,13 @@ def main():
             draw_torch(world, tx, ty, t + tx)
         draw_door(world, room, t)
         draw_chest(world, room, t)
+        for wx_, wy_, life in game.webs:  # zemindeki ağlar
+            c = (150, 155, 150) if life > 1 else (90, 94, 90)
+            for j in range(6):
+                a = j * math.pi / 3
+                pygame.draw.line(world, c, (int(wx_), int(wy_)), (int(wx_ + math.cos(a) * 20), int(wy_ + math.sin(a) * 12)))
+            pygame.draw.ellipse(world, c, (int(wx_) - 12, int(wy_) - 7, 24, 14), 1)
+            pygame.draw.ellipse(world, c, (int(wx_) - 19, int(wy_) - 11, 38, 22), 1)
         actors = list(game.enemies)
         if game.boss_dying:
             actors.append(game.boss_dying["boss"])
@@ -7646,7 +9330,8 @@ def main():
             lt = lights["torch"][int(t * 9 + i * 2) % 3]
             add_light(lt, tx * TILE + 8, ty * TILE + 8)
         if room.door_open:
-            add_light(lights["door"][int(t * 3) % 2], room.door_col * TILE + 8, 12)
+            for dc in room.door_cols():
+                add_light(lights["door"][int(t * 3) % 2], dc * TILE + 8, 12)
         if room.altar:
             ax, ay = room.altar[0] * TILE + 16, room.altar[1] * TILE
             add_light(lights["altar_low"] if room.altar_used else lights["altar"][int(t * 7) % 2], ax, ay)
@@ -7661,7 +9346,7 @@ def main():
         for sh in game.pshots:
             add_light(lights["ghost" if sh.kind == "ghost" else "shot"], sh.x, sh.y)
         for e in game.effects:
-            if e["kind"] in ("crater", "wave", "spin"):
+            if e["kind"] in ("crater", "wave", "spin", "spark"):
                 add_light(lights["fx"], e["x"], e["y"])
         if game.boss_dying:
             bd = game.boss_dying["boss"]
@@ -7676,6 +9361,9 @@ def main():
             add_light(lights["item"], room.shrine["x"], 62)
         world.blit(lightmap, (0, 0), special_flags=pygame.BLEND_RGB_MULT)
         if not haven:
+            fog = fog_layer(room.biome)  # süzülen sis
+            off = int(t * 7) % W
+            world.blit(fog, (-off, 0))
             world.blit(vignette, (0, 0), special_flags=pygame.BLEND_RGB_MULT)
 
         # parıltılar ve kendi ışığıyla parlayanlar
@@ -7687,6 +9375,7 @@ def main():
             add_glow(glows["ghost" if sh.kind == "ghost" else "shot"], sh.x, sh.y)
         draw_altar_fire(world, room, t)
         draw_shrine_fire(world, room, t)
+        draw_routes(world, font, room)
         draw_spikes(world, game, t)
         for h in game.hazards:
             h.draw(world, t)
@@ -7694,6 +9383,16 @@ def main():
             draw_effect(world, e, t)
         for e in game.enemies:
             e.draw_lit(world, t)
+            if e.active() and e.elite:  # seçkin düşman: dönen renkli halka
+                c = ELITES[e.elite]["col"]
+                for j in range(8):
+                    a = t * 3 + j * math.tau / 8
+                    wx_, wy_ = int(e.x + math.cos(a) * 10), int(e.y - 1 + math.sin(a) * 4)
+                    if 0 <= wx_ < W and 0 <= wy_ < WORLD_H:
+                        world.set_at((wx_, wy_), c)
+            if e.ward > 0 and e.active():  # koruma kabuğu
+                br = e.body_rect()
+                pygame.draw.ellipse(world, (200, 150, 255), br.inflate(6, 6), 1)
             if e.active() and (e.burn > 0 or e.slow > 0):  # ruh etkileri
                 br = e.body_rect()
                 c = (255, 150, 60) if e.burn > 0 else (150, 210, 255)
@@ -7733,9 +9432,19 @@ def main():
             b.draw(world)
         game.fx.draw(world)
         ash.draw(world)
-        for nx, ny, life, val in game.numbers:
+        for nx, ny, life, val, crit, _vx, _vy in game.numbers:
+            if crit:
+                text(world, big, f"{val}!", int(nx), int(ny) - 6, (255, 225, 90), center=True)
+                continue
             col = (255, 160, 60) if val >= 5 else (255, 240, 200) if val >= 3 else (230, 225, 235)
             draw_number(world, val, int(nx), int(ny), col)
+        if game.auto_target and game.auto_target.active() and game.state == "play":
+            br = game.auto_target.body_rect().inflate(6, 6)  # kilit köşeleri
+            c = (255, 230, 150) if int(t * 6) % 2 else (240, 150, 70)
+            for cx_, cy_, ox, oy in ((br.left, br.top, 1, 1), (br.right, br.top, -1, 1), (br.left, br.bottom, 1, -1),
+                                     (br.right, br.bottom, -1, -1)):
+                pygame.draw.line(world, c, (cx_, cy_), (cx_ + ox * 3, cy_))
+                pygame.draw.line(world, c, (cx_, cy_), (cx_, cy_ + oy * 3))
 
         if room.altar and not room.altar_used and game.state == "play":
             ax, ay = room.altar[0] * TILE + 16, room.altar[1] * TILE + 10
@@ -7789,6 +9498,9 @@ def main():
         if game.shake > 0 and settings["shake"]:
             m = int(math.ceil(game.shake))
             sx, sy = random.randint(-m, m), random.randint(-m, m)
+        if settings["shake"]:
+            sx += int(round(game.kick[0]))
+            sy += int(round(game.kick[1]))
         canvas.blit(world, (sx, sy))
 
         if game.dialog:
@@ -7805,15 +9517,18 @@ def main():
             shade = pygame.Surface((W, WORLD_H), pygame.SRCALPHA)
             shade.fill((0, 0, 0, min(160, int((game.state_t - 1) * 200))))
             canvas.blit(shade, (0, 0))
-            text(canvas, big, "KÜLE DÖNDÜN", W // 2, 50, (200, 60, 60), center=True)
-            text(canvas, font, f"{room.floor}. katta düştün, {game.kills} hortlak susturdun",
-                 W // 2, 74, (150, 140, 160), center=True)
-            kw = font.size(f"bu yolculukta {game.kul_run} kül topladın, külün seninle kalır")[0]
-            text(canvas, font, f"bu yolculukta {game.kul_run} kül topladın, külün seninle kalır",
-                 W // 2, 86, (255, 200, 140), center=True)
-            canvas.blit(kul_icon(), (W // 2 - kw // 2 - 9, 88))
-            text(canvas, font, "R: silah seç ve yeniden uyan  ·  K: kül sunağı", W // 2, 104, (110, 100, 130),
-                 center=True)
+            text(canvas, big, "KÜLE DÖNDÜN", W // 2, 16, (200, 60, 60), center=True)
+            text(canvas, font, f"{game.hero_name} · {save['runs']}. yolculuk · {WEAPONS[player.weapon]['name']}", W // 2, 34,
+                 (170, 150, 165), center=True)
+            rows = (("Ulaşılan yer", f"{room.floor}. kat, {room.depth}. oda"), ("Susturulan", f"{game.kills} düşman"),
+                    ("En yüksek kombo", str(game.best_combo)), ("Toplanan kül", str(game.kul_run)))
+            for i, (a_, b_) in enumerate(rows):
+                text(canvas, font, a_, 74, 48 + i * 11, (150, 140, 160))
+                text(canvas, font, b_, 170, 48 + i * 11, (255, 210, 150))
+            for i, key in enumerate(list(player.boons)[:22]):  # bu yolculuğun güçleri
+                canvas.blit(icon(key), (W // 2 - min(len(player.boons), 22) * 6 + i * 12, 98))
+            text(canvas, font, "Külün seninle kalır.", W // 2, 112, (255, 200, 140), center=True)
+            text(canvas, font, "R: yeni yolculuk  ·  K: kül sunağı", W // 2, 126, (130, 118, 150), center=True)
         draw_hud(canvas, font, game)
         if menu.open:
             draw_menu(canvas, font, big, menu, game, t)
