@@ -1310,7 +1310,7 @@ WEAPONS = {
                "stats": (2, 5, 1), "desc": "Hızlı seri, 3. vuruş ağır",
                "skills": [("seri", "Kor Seri", 5.0), ("tekme", "Ejder Tekmesi", 7.0),
                           ("volkan", "Volkan Yumruğu", 24.0)]},
-    "mizrak": {"name": "Kül Mızrağı", "role": "Mahzen Muhafızı", "time": 0.15, "cd": 0.38, "slow": 0.55,
+    "mizrak": {"name": "Kül Mızrağı", "role": "Mızrakçı", "time": 0.15, "cd": 0.38, "slow": 0.55,
                "stats": (3, 3, 4), "desc": "Uzun ve dar saplama",
                "skills": [("saplama", "Yıldırım Saplama", 5.0), ("donen", "Dönen Mızrak", 7.0),
                           ("kazik", "Kazık Ormanı", 22.0)]},
@@ -4540,7 +4540,7 @@ def draw_menu(surf, font, big, menu, game, t):
             text(surf, font, "Öykü hâlâ zindanda...", W // 2, y + 123, (200, 110, 140), center=True, shadow=False)
         text(surf, font, "W/S seç  ·  J onayla  ·  ESC devam", W // 2, H - 12, (110, 100, 130), center=True)
     elif menu.page == "settings":
-        x, y, w, h = 50, 22, 220, 128
+        x, y, w, h = 50, 14, 220, 144
         draw_panel(surf, x, y, w, h, t)
         text(surf, big, "AYARLAR", W // 2, y + 8, (240, 150, 90), center=True)
         pygame.draw.line(surf, (90, 50, 50), (x + 16, y + 26), (x + w - 16, y + 26))
@@ -6927,13 +6927,14 @@ class FpsMode:
         # kapılar ve toplananlar
         self.tp_cd -= dt
         if self.tp_cd <= 0:
-            for a, b in self.portals:
-                for src, dst in ((a, b), (b, a)):
-                    if math.hypot(self.px - src[0] - 0.5, self.py - src[1] - 0.5) < 0.6:
-                        self.px, self.py = dst[0] + 0.5, dst[1] + 0.5
-                        self.tp_cd, self.hurt = 1.4, 0.0
-                        self.game.flash = 0.1
-                        self.game.sfx.play("item", 0.6)
+            links = [pair for a, b in self.portals for pair in ((a, b), (b, a))]
+            for src, dst in links:
+                if math.hypot(self.px - src[0] - 0.5, self.py - src[1] - 0.5) < 0.6:
+                    self.px, self.py = dst[0] + 0.5, dst[1] + 0.5
+                    self.tp_cd, self.hurt = 1.4, 0.0
+                    self.game.flash = 0.1
+                    self.game.sfx.play("item", 0.6)
+                    break  # aynı karede geri ışınlanmasın
         for pk in self.picks[:]:
             if math.hypot(self.px - pk["x"], self.py - pk["y"]) < 0.6:
                 self.picks.remove(pk)
